@@ -1,0 +1,12 @@
+{
+  "id": "4ef6fb72-ddd7-4b38-b6d2-a837e8d11566",
+  "name": "test",
+  "ext": "md",
+  "tags": [
+    "caca"
+  ],
+  "size": 144,
+  "mime": "text/markdown",
+  "created_at": "2026-03-03T10:55:27.174142936+00:00",
+  "modified_at": "2026-03-03T11:29:42.796408271+00:00"
+}
