@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+
+{% block title %}Search — Synker{% endblock %}
+
+{% block nav_files_active %}active{% endblock %}
+
+{% block styles %}
+<link rel="stylesheet" href="/static/css/components.css">
+<link rel="stylesheet" href="/static/css/search.css">
+{% endblock %}
+
+{% block content %}
+<div class="search-page">
+
+    {# ─── Search Header ─── #}
+    <header class="search-header">
+        <div class="search-hero">
+            <h1 class="search-hero-title">Find your files</h1>
+            <p class="search-hero-subtitle">Search by name, content, tags, extension and more</p>
+        </div>
+
+        <div class="search-bar-wrapper">
+            <div class="search-bar">
+                <svg class="search-bar-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                <input
+                    type="text"
+                    class="search-bar-input"
+                    id="search-input"
+                    placeholder="Search files by name or content..."
+                    aria-label="Search files"
+                    autofocus
+                >
+                <button class="search-bar-clear" id="search-clear" hidden aria-label="Clear search">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                </button>
+                <button class="btn-filter-toggle" id="btn-filter-toggle" title="Toggle filters" aria-label="Toggle filters" aria-expanded="false">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+                    <span class="filter-count" id="filter-count" hidden>0</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    {# ─── Filters Panel ─── #}
+    <div class="filters-panel" id="filters-panel" data-open="false">
+        <div class="filters-inner">
+
+            <div class="filter-section">
+                <h3 class="filter-section-title">Tags</h3>
+                <div class="filter-tags" id="filter-tags">
+                    {# Populated by JS / Askama:
+                    {% for tag in available_tags %}
+                    <button class="tag" data-tag="{{ tag }}">{{ tag }}</button>
+                    {% endfor %}
+                    #}
+                    <span class="filter-empty">No tags available</span>
+                </div>
+            </div>
+
+            <div class="filters-grid">
+                <div class="filter-group">
+                    <label class="filter-label" for="filter-ext">Extension</label>
+                    <input type="text" class="filter-input" id="filter-ext" placeholder="e.g. md, rs, txt">
+                </div>
+
+                <div class="filter-group">
+                    <label class="filter-label" for="filter-content">Contains text</label>
+                    <input type="text" class="filter-input" id="filter-content" placeholder="Search inside files...">
+                </div>
+
+                <div class="filter-group">
+                    <label class="filter-label" for="filter-size-min">Size min (bytes)</label>
+                    <input type="number" class="filter-input" id="filter-size-min" placeholder="0" min="0">
+                </div>
+
+                <div class="filter-group">
+                    <label class="filter-label" for="filter-size-max">Size max (bytes)</label>
+                    <input type="number" class="filter-input" id="filter-size-max" placeholder="∞" min="0">
+                </div>
+
+                <div class="filter-group">
+                    <label class="filter-label" for="filter-modified-after">Modified after</label>
+                    <input type="date" class="filter-input" id="filter-modified-after">
+                </div>
+
+                <div class="filter-group">
+                    <label class="filter-label" for="filter-modified-before">Modified before</label>
+                    <input type="date" class="filter-input" id="filter-modified-before">
+                </div>
+            </div>
+
+            <div class="filter-toggles">
+                <label class="filter-toggle">
+                    <input type="checkbox" id="filter-orphans">
+                    <span class="filter-toggle-label">Orphans only</span>
+                    <span class="filter-toggle-hint">Files with no backlinks</span>
+                </label>
+            </div>
+
+            <div class="filters-actions">
+                <button class="btn btn-ghost" id="btn-clear-filters">Clear all</button>
+                <button class="btn btn-primary" id="btn-apply-filters">Apply filters</button>
+            </div>
+        </div>
+    </div>
+
+    {# ─── Active Filters Chips ─── #}
+    <div class="active-filters" id="active-filters" hidden>
+        {# Chips dynamically added by JS #}
+    </div>
+
+    {# ─── Results ─── #}
+    <div class="search-results" id="search-results">
+
+        <div class="results-header" id="results-header">
+            <span class="results-count" id="results-count">0 files</span>
+            <div class="results-view-toggle">
+                <button class="btn-icon btn-icon-sm" id="view-grid" title="Grid view" aria-label="Grid view">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+                </button>
+                <button class="btn-icon btn-icon-sm active" id="view-list" title="List view" aria-label="List view">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" x2="21" y1="6" y2="6"/><line x1="8" x2="21" y1="12" y2="12"/><line x1="8" x2="21" y1="18" y2="18"/><line x1="3" x2="3.01" y1="6" y2="6"/><line x1="3" x2="3.01" y1="12" y2="12"/><line x1="3" x2="3.01" y1="18" y2="18"/></svg>
+                </button>
+            </div>
+        </div>
+
+        <div class="results-list" id="results-list" data-view="list">
+            {# Populated by JS / Askama:
+            {% for file in results %}
+            <a class="result-card" href="/editor/{{ file.id }}" data-file-id="{{ file.id }}">
+                <div class="result-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg>
+                </div>
+                <div class="result-info">
+                    <span class="result-name">{{ file.metadata.name }}<span class="result-ext">.{{ file.metadata.ext }}</span></span>
+                    <span class="result-meta">{{ file.metadata.size }} bytes · {{ file.metadata.modified_at }}</span>
+                </div>
+                <div class="result-tags">
+                    {% for tag in file.metadata.tags %}
+                    <span class="tag tag-sm">{{ tag }}</span>
+                    {% endfor %}
+                </div>
+            </a>
+            {% endfor %}
+            #}
+
+            {# ─── Empty State ─── #}
+            <div class="results-empty" id="results-empty">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/><path d="M8 11h6"/></svg>
+                <p class="results-empty-title">No files yet</p>
+                <p class="results-empty-subtitle">Create a file in the editor to get started</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/search.js?v=3"></script>
+{% endblock %}

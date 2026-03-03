@@ -1,0 +1,292 @@
+{% extends "base.html" %}
+
+{% block title %}Editor — Synker{% endblock %}
+
+{% block nav_editor_active %}active{% endblock %}
+
+{% block styles %}
+<link rel="stylesheet" href="/static/css/components.css">
+<link rel="stylesheet" href="/static/css/editor.css">
+{% endblock %}
+
+{% block content %}
+<div class="editor-layout">
+
+    {# ─── File Sidebar ─── #}
+    <aside class="sidebar" id="sidebar" data-collapsed="false">
+        <div class="sidebar-header">
+            <h2 class="sidebar-title">Files</h2>
+            <div class="sidebar-actions">
+                <button class="btn-icon btn-icon-sm" id="btn-upload-file" title="Upload file" aria-label="Upload file">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                </button>
+                <button class="btn-icon btn-icon-sm" id="btn-new-file" title="New file" aria-label="New file">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+                </button>
+                <button class="btn-icon btn-icon-sm" id="btn-toggle-sidebar" title="Collapse sidebar" aria-label="Toggle sidebar">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg>
+                </button>
+            </div>
+        </div>
+
+        <div class="sidebar-search">
+            <div class="search-input-wrapper">
+                <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                <input type="text" class="search-input" id="file-search" placeholder="Search files..." aria-label="Search files">
+            </div>
+        </div>
+
+        <div class="sidebar-tags" id="sidebar-tags">
+            {# Tags populated dynamically by JS #}
+        </div>
+
+        <nav class="file-tree" id="file-tree" aria-label="File navigator">
+            {# File tree populated by JS #}
+        </nav>
+
+        <div class="sidebar-footer">
+            <div class="sync-status" id="sync-status">
+                <span class="sync-dot" data-status="synced"></span>
+                <span class="sync-label">Synced</span>
+            </div>
+        </div>
+    </aside>
+
+    {# ─── Main Editor Area ─── #}
+    <div class="editor-main">
+
+        {# ─── Toolbar ─── #}
+        <div class="toolbar" role="toolbar" aria-label="Formatting toolbar">
+            <div class="toolbar-group">
+                <button class="toolbar-btn" data-action="heading" title="Heading (Ctrl+H)" aria-label="Insert heading">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h8M4 18V6M12 18V6"/><path d="m17 12 3-2v8"/></svg>
+                    <span class="toolbar-label">H</span>
+                </button>
+                <button class="toolbar-btn" data-action="bold" title="Bold (Ctrl+B)" aria-label="Bold">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 12h9a4 4 0 0 1 0 8H7a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h7a4 4 0 0 1 0 8"/></svg>
+                </button>
+                <button class="toolbar-btn" data-action="italic" title="Italic (Ctrl+I)" aria-label="Italic">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" x2="10" y1="4" y2="4"/><line x1="14" x2="5" y1="20" y2="20"/><line x1="15" x2="9" y1="4" y2="20"/></svg>
+                </button>
+                <button class="toolbar-btn" data-action="strikethrough" title="Strikethrough" aria-label="Strikethrough">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4H9a3 3 0 0 0-2.83 4M14 12a4 4 0 0 1 0 8H6"/><line x1="4" x2="20" y1="12" y2="12"/></svg>
+                </button>
+            </div>
+
+            <div class="toolbar-divider"></div>
+
+            <div class="toolbar-group">
+                <button class="toolbar-btn" data-action="ul" title="Unordered list" aria-label="Unordered list">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" x2="21" y1="6" y2="6"/><line x1="8" x2="21" y1="12" y2="12"/><line x1="8" x2="21" y1="18" y2="18"/><line x1="3" x2="3.01" y1="6" y2="6"/><line x1="3" x2="3.01" y1="12" y2="12"/><line x1="3" x2="3.01" y1="18" y2="18"/></svg>
+                </button>
+                <button class="toolbar-btn" data-action="ol" title="Ordered list" aria-label="Ordered list">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="10" x2="21" y1="6" y2="6"/><line x1="10" x2="21" y1="12" y2="12"/><line x1="10" x2="21" y1="18" y2="18"/><path d="M4 6h1v4M4 10h2M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"/></svg>
+                </button>
+                <button class="toolbar-btn" data-action="checklist" title="Checklist" aria-label="Checklist">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="6" height="6" rx="1"/><path d="m3 17 2 2 4-4"/><line x1="13" x2="21" y1="6" y2="6"/><line x1="13" x2="21" y1="12" y2="12"/><line x1="13" x2="21" y1="18" y2="18"/></svg>
+                </button>
+            </div>
+
+            <div class="toolbar-divider"></div>
+
+            <div class="toolbar-group">
+                <button class="toolbar-btn" data-action="link" title="Link (Ctrl+K)" aria-label="Insert link">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                </button>
+                <button class="toolbar-btn" data-action="image" title="Image" aria-label="Insert image">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+                </button>
+                <button class="toolbar-btn" data-action="code" title="Inline code (Ctrl+`)" aria-label="Inline code">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+                </button>
+                <button class="toolbar-btn" data-action="codeblock" title="Code block" aria-label="Code block">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 16 4-4-4-4"/><path d="m6 8-4 4 4 4"/><path d="m14.5 4-5 16"/></svg>
+                </button>
+                <button class="toolbar-btn" data-action="blockquote" title="Blockquote" aria-label="Blockquote">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 21V3"/><path d="M10 6h10v4H10z"/><path d="M10 14h7v4h-7z"/></svg>
+                </button>
+                <button class="toolbar-btn" data-action="hr" title="Horizontal rule" aria-label="Horizontal rule">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="2" y1="12" x2="22" y2="12"/></svg>
+                </button>
+            </div>
+
+            <div class="toolbar-spacer"></div>
+
+            <div class="toolbar-group toolbar-group-right">
+                <button class="toolbar-btn" id="btn-download" title="Download file" aria-label="Download file" disabled>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    <span class="toolbar-label">Download</span>
+                </button>
+                <div class="toolbar-divider"></div>
+                <button class="toolbar-btn" data-action="toggle-preview" id="btn-toggle-preview" title="Toggle preview (Ctrl+P)" aria-label="Toggle preview">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>
+                    <span class="toolbar-label">Preview</span>
+                </button>
+                <select class="toolbar-select" id="view-mode" title="View mode" aria-label="View mode">
+                    <option value="split">Split</option>
+                    <option value="editor">Editor</option>
+                    <option value="preview">Preview</option>
+                </select>
+            </div>
+        </div>
+
+        {# ─── Properties / Metadata Panel ─── #}
+        <div class="tag-panel" id="tag-panel" style="display:none;">
+            <div class="tag-panel-header">
+                <span class="tag-panel-title">Properties</span>
+                <button class="btn-icon btn-icon-sm" id="btn-close-tags" title="Close" aria-label="Close properties panel">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                </button>
+            </div>
+            <div class="tag-panel-body">
+                {# ── Title ── #}
+                <label class="prop-label" for="fm-title">Title</label>
+                <input type="text" class="prop-input" id="fm-title" placeholder="Document title…" aria-label="Title">
+
+                {# ── Description ── #}
+                <label class="prop-label" for="fm-description">Description</label>
+                <textarea class="prop-input prop-textarea" id="fm-description" placeholder="Short description…" rows="2" aria-label="Description"></textarea>
+
+                {# ── Visibility ── #}
+                <label class="prop-label" for="fm-visibility">Visibility</label>
+                <select class="prop-input" id="fm-visibility" aria-label="Visibility">
+                    <option value="public">Public</option>
+                    <option value="private">Private</option>
+                    <option value="draft">Draft</option>
+                </select>
+
+                {# ── Date / Last Modified (read-only) ── #}
+                <div class="prop-dates">
+                    <div class="prop-date-item">
+                        <span class="prop-label">Created</span>
+                        <span class="prop-date-value" id="fm-date">—</span>
+                    </div>
+                    <div class="prop-date-item">
+                        <span class="prop-label">Modified</span>
+                        <span class="prop-date-value" id="fm-last-mod">—</span>
+                    </div>
+                </div>
+
+                {# ── Tags ── #}
+                <label class="prop-label">Tags</label>
+                <div class="tag-chips" id="file-tags">
+                    {# Current file tags rendered as removable chips by JS #}
+                </div>
+                <div class="tag-input-wrapper">
+                    <input type="text" class="tag-input" id="tag-input" placeholder="Add tag…" aria-label="Add tag" list="tag-suggestions">
+                    <datalist id="tag-suggestions"></datalist>
+                    <button class="btn-icon btn-icon-sm" id="btn-add-tag" title="Add tag" aria-label="Add tag">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        {# ─── Image Viewer (shown instead of editor for image files) ─── #}
+        <div class="image-viewer" id="image-viewer" style="display:none;">
+            <div class="image-viewer-toolbar">
+                <button class="btn-icon" id="btn-zoom-in" title="Zoom in"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg></button>
+                <button class="btn-icon" id="btn-zoom-out" title="Zoom out"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg></button>
+                <button class="btn-icon" id="btn-zoom-reset" title="Reset zoom"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg></button>
+            </div>
+            <div class="image-viewer-container">
+                <img id="image-preview" alt="File preview" />
+            </div>
+        </div>
+
+        {# ─── Editor + Preview Panes ─── #}
+        <div class="editor-panes" id="editor-panes" data-view="split">
+
+            <div class="pane pane-editor" id="pane-editor">
+                <div class="pane-header">
+                    <span class="pane-label">Markdown</span>
+                    <div class="pane-meta">
+                        <span class="char-count" id="char-count">0 chars</span>
+                        <span class="word-count" id="word-count">0 words</span>
+                    </div>
+                </div>
+                <div class="editor-container">
+                    <div class="line-numbers" id="line-numbers" aria-hidden="true"></div>
+                    <textarea
+                        class="editor-textarea"
+                        id="editor"
+                        placeholder="Start writing markdown..."
+                        spellcheck="true"
+                        aria-label="Markdown editor"
+                    ></textarea>
+                </div>
+            </div>
+
+            <div class="pane-resizer" id="pane-resizer" role="separator" aria-orientation="vertical" aria-label="Resize panes" tabindex="0"></div>
+
+            <div class="pane pane-preview" id="pane-preview">
+                <div class="pane-header">
+                    <span class="pane-label">Preview</span>
+                </div>
+                <article class="preview-content markdown-body" id="preview">
+                    <p class="preview-placeholder">Preview will appear here...</p>
+                </article>
+            </div>
+        </div>
+
+        {# ─── Status Bar ─── #}
+        <div class="status-bar">
+            <div class="status-left">
+                <span class="status-item status-file-name" id="status-file" title="Click to rename">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg>
+                    <span id="status-file-label">untitled.md</span>
+                </span>
+                <input type="text" class="rename-input" id="rename-input" hidden aria-label="Rename file">
+                <button class="btn-icon btn-icon-xs" id="btn-tags-toggle" title="Manage tags" aria-label="Toggle tag panel">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15.5 3-10 10a1 1 0 0 0 0 1.41l4.59 4.59a1 1 0 0 0 1.41 0l10-10V3h-6z"/><circle cx="18" cy="6" r="1.5"/></svg>
+                </button>
+                <span class="status-item status-modified" id="status-modified" hidden>Modified</span>
+            </div>
+            <div class="status-center">
+                <span class="status-item" id="status-cursor">Ln 1, Col 1</span>
+            </div>
+            <div class="status-right">
+                <span class="status-item" id="status-type">Markdown</span>
+                <span class="status-item">UTF-8</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# ─── Upload Modal (starts hidden via CSS .modal-overlay { display:none }) ─── #}
+<div class="modal-overlay" id="upload-modal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 class="modal-title">Upload File</h3>
+            <button class="btn-icon btn-icon-sm" id="btn-close-upload" aria-label="Close">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+            </button>
+        </div>
+        <div class="modal-body">
+            <div class="upload-dropzone" id="upload-dropzone">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                <p>Drag &amp; drop a file here, or <label class="upload-browse" for="upload-input">browse</label></p>
+                <input type="file" id="upload-input" hidden />
+            </div>
+            <div class="upload-file-info" id="upload-file-info" style="display:none;">
+                <span class="upload-file-name" id="upload-file-name"></span>
+                <span class="upload-file-size" id="upload-file-size"></span>
+            </div>
+            <div class="upload-tags-row">
+                <label for="upload-tags">Tags (comma-separated):</label>
+                <input type="text" class="upload-tags-input" id="upload-tags" placeholder="e.g. notes, draft">
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" id="btn-cancel-upload">Cancel</button>
+            <button class="btn btn-primary" id="btn-confirm-upload" disabled>Upload</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/highlight.min.js"></script>
+<script src="/static/js/markdown.js?v=3"></script>
+<script src="/static/js/editor.js?v=5"></script>
+{% endblock %}
