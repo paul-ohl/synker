@@ -10,6 +10,7 @@ pub struct SynchronisationReport {
     pub pending_changes: usize,
 }
 
+#[derive(Debug)]
 pub enum SynchronisationError {
     NetworkError(String),
     SyncToolError(String),
