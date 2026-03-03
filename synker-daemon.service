@@ -1,0 +1,15 @@
+[Unit]
+Description=Synker Daemon - file watcher and git auto-sync
+After=network.target
+
+[Service]
+Type=simple
+User=YOUR_USER
+WorkingDirectory=/path/to/synker
+ExecStart=/path/to/synker/target/release/synker daemon
+EnvironmentFile=/path/to/synker/.env
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

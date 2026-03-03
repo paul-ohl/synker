@@ -17,3 +17,8 @@
   * Initialiser un nouvel appareil
   * Intégrer les fonctionnalités de parcours de fichiers et de recherche de
     l'éditeur web
+
+## Next todos
+
+* [ ] Make the service file more generic
+* [ ] Refactor logic/synchronisation as it currently doesn't use the trait in services/synchronisation.
