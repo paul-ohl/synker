@@ -39,16 +39,54 @@
     // ═════════════════════════════════════════════════
     // Theme (reuse from global)
     // ═════════════════════════════════════════════════
+    const THEMES = [
+        { id: "nord",     label: "Nord",          icon: "❄" },
+        { id: "matrix",   label: "Matrix",        icon: "⌨" },
+        { id: "nerd",     label: "Nerd",          icon: "🤓" },
+        { id: "contrast", label: "High Contrast", icon: "◑" },
+        { id: "pinky",    label: "Pinky",         icon: "🌸" },
+    ];
+
     function initTheme() {
         const saved = localStorage.getItem("synker-theme");
         if (saved) document.documentElement.dataset.theme = saved;
+        updateThemeUI();
     }
 
-    function toggleTheme() {
-        const html = document.documentElement;
-        const next = (html.dataset.theme || "dark") === "dark" ? "light" : "dark";
-        html.dataset.theme = next;
-        localStorage.setItem("synker-theme", next);
+    function setTheme(themeId) {
+        document.documentElement.dataset.theme = themeId;
+        localStorage.setItem("synker-theme", themeId);
+        updateThemeUI();
+    }
+
+    function updateThemeUI() {
+        const current = document.documentElement.dataset.theme || "nord";
+        const theme = THEMES.find(t => t.id === current) || THEMES[0];
+
+        const btnIcon = $("#theme-btn-icon");
+        const btnLabel = $("#theme-btn-label");
+        if (btnIcon) btnIcon.textContent = theme.icon;
+        if (btnLabel) btnLabel.textContent = theme.label;
+
+        $$("#theme-menu .theme-option").forEach(opt => {
+            opt.classList.toggle("active", opt.dataset.themeValue === current);
+        });
+    }
+
+    function toggleThemeMenu() {
+        const menu = $("#theme-menu");
+        const btn = $("#theme-toggle");
+        if (!menu) return;
+        const isOpen = menu.classList.contains("open");
+        menu.classList.toggle("open", !isOpen);
+        if (btn) btn.setAttribute("aria-expanded", !isOpen);
+    }
+
+    function closeThemeMenu() {
+        const menu = $("#theme-menu");
+        const btn = $("#theme-toggle");
+        if (menu) menu.classList.remove("open");
+        if (btn) btn.setAttribute("aria-expanded", "false");
     }
 
     // ═════════════════════════════════════════════════
@@ -441,7 +479,25 @@
         });
 
         // Theme
-        if (themeToggle) themeToggle.addEventListener("click", toggleTheme);
+        if (themeToggle) {
+            themeToggle.addEventListener("click", (e) => {
+                e.stopPropagation();
+                toggleThemeMenu();
+            });
+        }
+        const themeMenu = $("#theme-menu");
+        if (themeMenu) {
+            themeMenu.addEventListener("click", (e) => {
+                const opt = e.target.closest(".theme-option");
+                if (opt && opt.dataset.themeValue) {
+                    setTheme(opt.dataset.themeValue);
+                    closeThemeMenu();
+                }
+            });
+        }
+        document.addEventListener("click", (e) => {
+            if (!e.target.closest("#theme-switcher")) closeThemeMenu();
+        });
 
         // Initial load
         loadTags();

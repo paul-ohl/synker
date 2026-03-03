@@ -540,3 +540,91 @@
         padding: 0 var(--space-2);
     }
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   Syntax Highlighting (highlight.js token mapping)
+   Uses CSS variables from each theme for full theme awareness.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Reset hljs default background */
+.hljs {
+    background: transparent !important;
+    padding: 0 !important;
+}
+
+/* Keywords: if, else, for, while, return, def, class, import, etc. */
+.hljs-keyword,
+.hljs-selector-tag { color: var(--hl-keyword); }
+
+/* Strings */
+.hljs-string,
+.hljs-template-variable,
+.hljs-regexp { color: var(--hl-string); }
+
+/* Numbers */
+.hljs-number,
+.hljs-literal { color: var(--hl-number); }
+
+/* Comments */
+.hljs-comment,
+.hljs-doctag { color: var(--hl-comment); font-style: italic; }
+
+/* Functions / method calls */
+.hljs-title.function_,
+.hljs-title { color: var(--hl-function); }
+
+/* Types / classes */
+.hljs-type,
+.hljs-title.class_,
+.hljs-title.class_.inherited__ { color: var(--hl-type); }
+
+/* Variables / params */
+.hljs-variable,
+.hljs-params { color: var(--hl-variable); }
+
+/* Operators / punctuation */
+.hljs-operator,
+.hljs-punctuation { color: var(--hl-operator); }
+
+/* Built-in / standard library */
+.hljs-built_in { color: var(--hl-builtin); }
+
+/* Attributes (HTML/XML attrs, decorator names) */
+.hljs-attr,
+.hljs-attribute { color: var(--hl-attr); }
+
+/* HTML/XML tags */
+.hljs-tag { color: var(--hl-tag); }
+.hljs-name { color: var(--hl-tag); }
+
+/* CSS selectors */
+.hljs-selector-class,
+.hljs-selector-id,
+.hljs-selector-pseudo { color: var(--hl-selector); }
+
+/* Meta / preprocessor */
+.hljs-meta,
+.hljs-meta .hljs-keyword,
+.hljs-meta .hljs-string { color: var(--hl-meta); }
+
+/* Diff */
+.hljs-deletion { color: var(--hl-deletion); }
+.hljs-addition { color: var(--hl-addition); }
+
+/* Emphasis */
+.hljs-emphasis { font-style: var(--hl-emphasis); }
+.hljs-strong { font-weight: var(--hl-strong); }
+
+/* Section headings in code (e.g. INI files) */
+.hljs-section { color: var(--hl-function); font-weight: 600; }
+
+/* Symbol / bullet / link */
+.hljs-symbol,
+.hljs-bullet,
+.hljs-link { color: var(--hl-builtin); }
+
+/* Property (JSON keys, YAML keys, CSS properties) */
+.hljs-property { color: var(--hl-attr); }
+
+/* Subst (template literals ${...}) */
+.hljs-subst { color: var(--hl-variable); }
