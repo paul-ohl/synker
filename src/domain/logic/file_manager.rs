@@ -79,9 +79,7 @@ impl FileManagerLogic {
     }
 
     pub fn find(&self, query: FileQuery) -> Result<Vec<Metadata>, FileManagerError> {
-        query
-            .verify()
-            .map_err(|e| FileManagerError::ValidationError(e))?;
+        query.verify().map_err(FileManagerError::ValidationError)?;
 
         self.adapter.find(query)
     }

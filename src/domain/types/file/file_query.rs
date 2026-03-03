@@ -42,6 +42,7 @@ impl FileQuery {
     /// # Examples
     ///
     /// ```
+    /// use synker::domain::types::file::file_query::FileQuery;
     /// let query = FileQuery::new();
     /// ```
     pub fn new() -> Self {
@@ -198,22 +199,23 @@ impl FileQuery {
     /// # Examples
     ///
     /// ```
+    /// use synker::domain::types::file::file_query::FileQuery;
     /// let query = FileQuery::new()
     ///     .with_extension("rs".to_string())
     ///     .verify()?;
     /// # Ok::<(), String>(())
     /// ```
     pub fn verify(&self) -> Result<(), String> {
-        if let (Some(greater), Some(smaller)) = (self.size_greater_than, self.size_smaller_than) {
-            if greater > smaller {
-                return Err("size_greater_than cannot be larger than size_smaller_than".to_string());
-            }
+        if let (Some(greater), Some(smaller)) = (self.size_greater_than, self.size_smaller_than)
+            && greater > smaller
+        {
+            return Err("size_greater_than cannot be larger than size_smaller_than".to_string());
         }
 
-        if let (Some(after), Some(before)) = (self.modified_after, self.modified_before) {
-            if after > before {
-                return Err("modified_after cannot be later than modified_before".to_string());
-            }
+        if let (Some(after), Some(before)) = (self.modified_after, self.modified_before)
+            && after > before
+        {
+            return Err("modified_after cannot be later than modified_before".to_string());
         }
 
         if self.backlinks_to.is_some() && self.links_to.is_some() {

@@ -108,28 +108,28 @@ impl UpdateMetadata {
     }
 
     fn validate(&self) -> Result<(), MetadataCreationError> {
-        if let Some(name) = &self.name {
-            if name.trim().is_empty() {
-                return Err(MetadataCreationError::InvalidName(name.clone()));
-            }
+        if let Some(name) = &self.name
+            && name.trim().is_empty()
+        {
+            return Err(MetadataCreationError::InvalidName(name.clone()));
         }
-        if let Some(ext) = &self.ext {
-            if ext.trim().is_empty() {
-                return Err(MetadataCreationError::InvalidExtension(ext.clone()));
-            }
+        if let Some(ext) = &self.ext
+            && ext.trim().is_empty()
+        {
+            return Err(MetadataCreationError::InvalidExtension(ext.clone()));
         }
-        if let Some(tags) = &self.tags {
-            if tags.iter().any(|tag| tag.trim().is_empty()) {
-                return Err(MetadataCreationError::InvalidTags(format!(
-                    "Tags cannot contain empty strings: {:?}",
-                    tags
-                )));
-            }
+        if let Some(tags) = &self.tags
+            && tags.iter().any(|tag| tag.trim().is_empty())
+        {
+            return Err(MetadataCreationError::InvalidTags(format!(
+                "Tags cannot contain empty strings: {:?}",
+                tags
+            )));
         }
-        if let Some(mime) = &self.mime {
-            if mime.trim().is_empty() {
-                return Err(MetadataCreationError::InvalidMimeType(mime.clone()));
-            }
+        if let Some(mime) = &self.mime
+            && mime.trim().is_empty()
+        {
+            return Err(MetadataCreationError::InvalidMimeType(mime.clone()));
         }
         Ok(())
     }
