@@ -21,6 +21,7 @@
     const btnApplyFilters  = $("#btn-apply-filters");
     const viewGrid         = $("#view-grid");
     const viewList         = $("#view-list");
+    const btnToggleTitles  = $("#btn-toggle-titles");
     const themeToggle      = $("#theme-toggle");
 
     // Filter inputs
@@ -35,6 +36,8 @@
     // ─── State ───
     let currentFilters = {};
     let selectedTags = new Set();
+    let showTitles = localStorage.getItem("synker-search-show-titles") !== "false"; // default true
+    let lastResults = null;
 
     // ═════════════════════════════════════════════════
     // Theme (reuse from global)
@@ -249,12 +252,16 @@
             const res = await fetch("/api/files");
             if (!res.ok) throw new Error(res.statusText);
             let results = await res.json();
+            const allFiles = results;
 
             // Client-side filtering (the API list returns all files,
             // we apply filters client-side for responsiveness)
             results = results.filter(file => {
                 if (filters.name_contains) {
-                    if (!file.name.toLowerCase().includes(filters.name_contains.toLowerCase())) return false;
+                    const q = filters.name_contains.toLowerCase();
+                    const nameMatch = file.name.toLowerCase().includes(q);
+                    const titleMatch = file.title && file.title.toLowerCase().includes(q);
+                    if (!nameMatch && !titleMatch) return false;
                 }
                 if (filters.extension) {
                     if (!file.ext.toLowerCase().includes(filters.extension.toLowerCase())) return false;
@@ -268,6 +275,78 @@
                 return true;
             });
 
+            // Content search and orphan detection may both need file contents,
+            // so fetch them together when either filter is active.
+            const needContent = !!filters.file_contains;
+            const needOrphans = !!filters.orphans;
+            const IMAGE_EXTS = new Set(["png","jpg","jpeg","gif","bmp","webp","svg","ico","avif"]);
+
+            if (needContent || needOrphans) {
+                // We need contents of all markdown/text files (for link scanning)
+                const allTextFiles = (needOrphans ? allFiles : results).filter(f => !IMAGE_EXTS.has(f.ext.toLowerCase()));
+
+                const contentResults = await Promise.allSettled(
+                    allTextFiles.map(async (file) => {
+                        const resp = await fetch(`/api/files/${file.id}`);
+                        if (!resp.ok) return { file, content: "" };
+                        const data = await resp.json();
+                        return { file, content: (data.content || "") };
+                    })
+                );
+
+                const contentByFile = new Map();
+                contentResults.forEach(r => {
+                    if (r.status === "fulfilled") {
+                        contentByFile.set(r.value.file.id, r.value.content);
+                    }
+                });
+
+                // Content search filter
+                if (needContent) {
+                    const contentQuery = filters.file_contains.toLowerCase();
+                    results = results.filter(f => {
+                        if (IMAGE_EXTS.has(f.ext.toLowerCase())) return false;
+                        const content = (contentByFile.get(f.id) || "").toLowerCase();
+                        return content.includes(contentQuery);
+                    });
+                }
+
+                // Orphan filter: find files that no other file links to
+                if (needOrphans) {
+                    // Build a set of file names that are linked to by any file
+                    const linkedNames = new Set();
+                    for (const [, content] of contentByFile) {
+                        const lower = content.toLowerCase();
+                        // Detect wikilinks: [[target]] or [[target|alias]]
+                        const wikiRe = /\[\[([^\]|]+)/g;
+                        let m;
+                        while ((m = wikiRe.exec(lower)) !== null) {
+                            linkedNames.add(m[1].trim());
+                        }
+                        // Detect markdown links: [text](target) or [text](target.md)
+                        const mdRe = /\]\(([^)]+)\)/g;
+                        while ((m = mdRe.exec(lower)) !== null) {
+                            const target = m[1].trim();
+                            // Skip external URLs
+                            if (!target.startsWith("http://") && !target.startsWith("https://")) {
+                                linkedNames.add(target);
+                                // Also add without .md extension
+                                if (target.endsWith(".md")) {
+                                    linkedNames.add(target.slice(0, -3));
+                                }
+                            }
+                        }
+                    }
+
+                    results = results.filter(f => {
+                        const nameLower = f.name.toLowerCase();
+                        const fullNameLower = `${f.name}.${f.ext}`.toLowerCase();
+                        // A file is an orphan if no other file links to it
+                        return !linkedNames.has(nameLower) && !linkedNames.has(fullNameLower);
+                    });
+                }
+            }
+
             renderResults(results);
         } catch (e) {
             console.error("Search failed:", e);
@@ -275,7 +354,13 @@
         }
     }
 
+    function fileDisplayName(file) {
+        if (showTitles && file.title) return file.title;
+        return file.name;
+    }
+
     function renderResults(results) {
+        lastResults = results;
         const empty = $("#results-empty");
         resultsCount.textContent = `${results.length} file${results.length !== 1 ? "s" : ""}`;
 
@@ -294,11 +379,16 @@
 
         if (empty) empty.style.display = "none";
 
-        resultsList.innerHTML = results.map(file => `
+        resultsList.innerHTML = results.map(file => {
+            const displayName = escapeHtml(fileDisplayName(file));
+            const tooltipTitle = showTitles && file.title
+                ? `title="${escapeHtml(file.name)}.${escapeHtml(file.ext)}"`
+                : (file.title ? `title="${escapeHtml(file.title)}"` : "");
+            return `
             <div class="result-card" data-file-id="${file.id}">
                 <div class="result-card-header">
                     <svg class="result-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg>
-                    <span class="result-name">${escapeHtml(file.name)}</span>
+                    <span class="result-name" ${tooltipTitle}>${displayName}</span>
                     <span class="result-ext">.${escapeHtml(file.ext)}</span>
                     <button class="result-delete" data-file-id="${file.id}" title="Delete file">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
@@ -314,7 +404,8 @@
                     </div>
                 ` : ""}
             </div>
-        `).join("");
+            `;
+        }).join("");
     }
 
     function escapeHtml(text) {
@@ -458,6 +549,18 @@
         // View toggles
         viewGrid.addEventListener("click", () => setView("grid"));
         viewList.addEventListener("click", () => setView("list"));
+
+        // Title toggle
+        if (btnToggleTitles) {
+            if (showTitles) btnToggleTitles.classList.add("active");
+            btnToggleTitles.addEventListener("click", () => {
+                showTitles = !showTitles;
+                localStorage.setItem("synker-search-show-titles", showTitles);
+                btnToggleTitles.classList.toggle("active", showTitles);
+                // Re-render current results without re-fetching
+                if (lastResults) renderResults(lastResults);
+            });
+        }
 
         // Tag clicks
         const filterTagsEl = $("#filter-tags");

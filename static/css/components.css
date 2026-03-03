@@ -13,6 +13,7 @@
     transition: width var(--duration-slow) var(--ease-out),
                 min-width var(--duration-slow) var(--ease-out);
     overflow: hidden;
+    min-height: 0;
 }
 
 .sidebar[data-collapsed="true"] {
@@ -98,8 +99,12 @@
     gap: var(--space-1);
     padding: 0 var(--space-3) var(--space-2);
     flex-wrap: wrap;
-    flex-shrink: 0;
+    flex-shrink: 1;
+    min-height: 0;
+    overflow-y: auto;
+    max-height: 120px;
     transition: opacity var(--duration-normal) var(--ease-out);
+    -webkit-overflow-scrolling: touch;
 }
 
 .tag {
@@ -129,6 +134,8 @@
     overflow-y: auto;
     padding: var(--space-2) var(--space-2);
     transition: opacity var(--duration-normal) var(--ease-out);
+    min-height: 0;
+    -webkit-overflow-scrolling: touch;
 }
 
 .file-tree-item {
@@ -175,6 +182,34 @@
     color: var(--color-text-muted);
     font-size: var(--text-xs);
     flex-shrink: 0;
+}
+
+.file-ext-subtle {
+    opacity: 0.5;
+    font-style: italic;
+}
+
+/* ─── Sidebar Resize Handle ─── */
+.sidebar-resize-handle {
+    width: 4px;
+    cursor: col-resize;
+    background: transparent;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 10;
+    transition: background var(--duration-fast) var(--ease-out);
+}
+.sidebar-resize-handle::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: -3px;
+    right: -3px;
+    bottom: 0;
+}
+.sidebar-resize-handle:hover,
+.sidebar-resize-handle.dragging {
+    background: var(--color-accent);
 }
 
 /* ─── Sidebar Footer ─── */
@@ -334,83 +369,7 @@
     font-weight: 500;
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   Responsive — Tablet
-   ═══════════════════════════════════════════════════════════════ */
-
-@media (max-width: 768px) {
-    .sidebar {
-        position: absolute;
-        top: var(--nav-height);
-        left: 0;
-        bottom: 0;
-        z-index: 50;
-        box-shadow: var(--shadow-lg);
-        width: 280px;
-        min-width: 280px;
-    }
-    .sidebar[data-collapsed="true"] {
-        transform: translateX(-100%);
-        width: 0;
-        min-width: 0;
-    }
-
-    .toolbar {
-        gap: 0;
-    }
-    .toolbar-label {
-        display: none;
-    }
-    .toolbar-divider:nth-child(n+4) {
-        display: none;
-    }
-
-    .status-center {
-        display: none;
-    }
-}
-
-/* ═══════════════════════════════════════════════════════════════
-   Responsive — Phone
-   ═══════════════════════════════════════════════════════════════ */
-
-@media (max-width: 480px) {
-    .sidebar {
-        width: 100%;
-        min-width: 100%;
-    }
-
-    .toolbar {
-        height: 36px;
-        padding: 0 var(--space-1);
-    }
-
-    .toolbar-btn {
-        min-width: 24px;
-        height: 24px;
-        padding: 2px 4px;
-    }
-
-    .toolbar-divider {
-        margin: 0 1px;
-        height: 14px;
-    }
-
-    .toolbar-select {
-        font-size: 10px;
-        padding: 2px 20px 2px 4px;
-    }
-
-    .status-bar {
-        height: 20px;
-        font-size: 10px;
-        padding: 0 var(--space-2);
-    }
-
-    .status-right {
-        display: none;
-    }
-}
+/* (Responsive rules consolidated at end of file) */
 
 /* ─── File Tree Delete Button ─── */
 .file-tree-delete {
@@ -921,4 +880,294 @@ select.prop-input {
 
 .btn-secondary:hover {
     background: var(--color-bg-inset);
+}
+
+/* ─── Sidebar Mobile Overlay ─── */
+.sidebar-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 49;
+}
+.sidebar-overlay.visible {
+    display: block;
+}
+
+/* ─── Mobile Toggle Button (shown when sidebar is collapsed on small screens) ─── */
+.sidebar-mobile-toggle {
+    display: none;
+    position: fixed;
+    bottom: var(--space-4);
+    left: var(--space-4);
+    z-index: 50;
+    width: 44px;
+    height: 44px;
+    border-radius: var(--radius-full);
+    background: var(--color-accent);
+    color: var(--color-text-inverse);
+    border: none;
+    cursor: pointer;
+    box-shadow: var(--shadow-md);
+    align-items: center;
+    justify-content: center;
+    transition: transform var(--duration-fast) var(--ease-out),
+                box-shadow var(--duration-fast) var(--ease-out);
+}
+.sidebar-mobile-toggle:hover {
+    transform: scale(1.1);
+    box-shadow: var(--shadow-lg);
+}
+
+/* ─── Mobile Pane Toggle Button (editor ↔ preview) ─── */
+.mobile-pane-toggle {
+    display: none;
+    position: fixed;
+    bottom: var(--space-4);
+    right: var(--space-4);
+    z-index: 50;
+    width: 48px;
+    height: 48px;
+    border-radius: var(--radius-full);
+    background: var(--color-accent);
+    color: var(--color-text-inverse);
+    border: none;
+    cursor: pointer;
+    box-shadow: var(--shadow-md);
+    align-items: center;
+    justify-content: center;
+    transition: transform var(--duration-fast) var(--ease-out),
+                box-shadow var(--duration-fast) var(--ease-out);
+}
+.mobile-pane-toggle:hover {
+    transform: scale(1.1);
+    box-shadow: var(--shadow-lg);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Responsive — Tablet (≤ 768px)
+   ═══════════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+    /* ── Sidebar ── */
+    .sidebar {
+        position: fixed;
+        top: var(--nav-height);
+        left: 0;
+        bottom: 0;
+        z-index: 50;
+        width: 280px !important;
+        min-width: 280px !important;
+        transform: translateX(0);
+        transition: transform var(--duration-slow) var(--ease-out);
+        box-shadow: var(--shadow-lg);
+    }
+    .sidebar[data-collapsed="true"] {
+        transform: translateX(-100%);
+        width: 280px !important;
+        min-width: 280px !important;
+    }
+    .sidebar-resize-handle {
+        display: none;
+    }
+    .sidebar-mobile-toggle {
+        display: flex;
+    }
+    .mobile-pane-toggle {
+        display: flex;
+    }
+    /* Sidebar tags: collapse to 2 rows max on tablet */
+    .sidebar-tags {
+        max-height: 72px;
+    }
+    /* Hide the desktop view-mode select on mobile — use the FAB instead */
+    .toolbar-select#view-mode {
+        display: none;
+    }
+    /* ── Toolbar ── */
+    .toolbar {
+        gap: 0;
+    }
+    .toolbar-label {
+        display: none;
+    }
+    .toolbar-divider:nth-child(n+4) {
+        display: none;
+    }
+    /* ── Status bar ── */
+    .status-bar {
+        height: 36px;
+        padding: 0 var(--space-3);
+        font-size: var(--text-sm);
+    }
+    .status-center {
+        display: none;
+    }
+    .status-item {
+        padding: var(--space-1) var(--space-2);
+        min-height: 28px;
+    }
+    .btn-icon-xs {
+        width: 28px;
+        height: 28px;
+    }
+    /* ── Touch targets ── */
+    .sidebar-actions .btn-icon {
+        width: 36px;
+        height: 36px;
+    }
+    .file-tree-item {
+        padding: var(--space-3) var(--space-3);
+        min-height: 40px;
+    }
+    .file-tree-delete {
+        width: 28px;
+        height: 28px;
+        opacity: 0.5;
+    }
+    /* ── Toast: move above mobile FABs ── */
+    #toast-container {
+        bottom: 80px;
+        right: var(--space-3);
+        left: var(--space-3);
+    }
+    .toast {
+        font-size: var(--text-base);
+    }
+    /* ── Tag panel ── */
+    .tag-panel {
+        padding: var(--space-2) var(--space-3);
+    }
+    .tag-input {
+        padding: var(--space-2) var(--space-3);
+        font-size: var(--text-sm);
+    }
+    /* ── Properties panel ── */
+    .prop-dates {
+        flex-direction: column;
+        gap: var(--space-2);
+    }
+    .prop-input {
+        padding: var(--space-2) var(--space-3);
+        font-size: var(--text-sm);
+    }
+    /* ── Upload modal ── */
+    .modal {
+        width: 95%;
+        max-width: none;
+        margin: var(--space-3);
+    }
+    .upload-dropzone {
+        padding: var(--space-4);
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Responsive — Phone (≤ 480px)
+   ═══════════════════════════════════════════════════════════════ */
+@media (max-width: 480px) {
+    /* ── Sidebar ── */
+    .sidebar {
+        width: 100vw !important;
+        min-width: 100vw !important;
+    }
+    .sidebar[data-collapsed="true"] {
+        width: 100vw !important;
+        min-width: 100vw !important;
+    }
+    /* Tags: shrink further on phone */
+    .sidebar-tags {
+        max-height: 56px;
+        padding: 0 var(--space-2) var(--space-1);
+    }
+    .sidebar-tag-chip {
+        padding: 0.2rem 0.4rem;
+        font-size: 0.65rem;
+    }
+    /* Search input bigger for touch */
+    .search-input {
+        padding: var(--space-3) var(--space-3);
+        padding-left: calc(var(--space-2) + 14px + var(--space-2));
+        font-size: var(--text-base);
+    }
+    /* ── Toolbar ── */
+    .toolbar {
+        height: 44px;
+        padding: 0 var(--space-2);
+    }
+    .toolbar-btn {
+        min-width: 32px;
+        height: 32px;
+        padding: 4px 6px;
+    }
+    .toolbar-divider {
+        margin: 0 2px;
+        height: 18px;
+    }
+    .toolbar-select {
+        font-size: 11px;
+        padding: 4px 22px 4px 6px;
+        height: 28px;
+    }
+    /* ── Status bar ── */
+    .status-bar {
+        height: 40px;
+        font-size: var(--text-sm);
+        padding: 0 var(--space-2);
+    }
+    .status-right {
+        display: none;
+    }
+    .status-item {
+        padding: var(--space-1) var(--space-2);
+        min-height: 32px;
+    }
+    /* ── Touch targets ── */
+    .sidebar-actions .btn-icon {
+        width: 40px;
+        height: 40px;
+    }
+    .file-tree-item {
+        padding: var(--space-3) var(--space-4);
+        min-height: 44px;
+        font-size: var(--text-base);
+    }
+    .file-tree-delete {
+        width: 32px;
+        height: 32px;
+    }
+    .mobile-pane-toggle,
+    .sidebar-mobile-toggle {
+        width: 52px;
+        height: 52px;
+    }
+    .mobile-pane-toggle svg,
+    .sidebar-mobile-toggle svg {
+        width: 24px;
+        height: 24px;
+    }
+    /* ── Toast ── */
+    #toast-container {
+        bottom: 72px;
+        left: var(--space-2);
+        right: var(--space-2);
+    }
+    /* ── Upload modal ── */
+    .modal {
+        width: 100%;
+        max-width: none;
+        margin: 0;
+        border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+    .modal-body {
+        padding: var(--space-3);
+    }
+    .upload-dropzone {
+        padding: var(--space-3);
+    }
+    .btn {
+        padding: var(--space-2) var(--space-3);
+        min-height: 40px;
+    }
 }

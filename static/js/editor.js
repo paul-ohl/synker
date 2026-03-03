@@ -57,6 +57,26 @@
     const btnZoomOut    = $("#btn-zoom-out");
     const btnZoomReset  = $("#btn-zoom-reset");
 
+    // Wiki-link autocomplete
+    const linkAutocomplete = $("#link-autocomplete");
+    const linkAutocompleteList = $("#link-autocomplete-list");
+
+    // Wiki-link toolbar file picker
+    const btnWikiLink       = $("#btn-wiki-link");
+    const linkPicker        = $("#link-picker");
+    const linkPickerSearch  = $("#link-picker-search");
+    const linkPickerList    = $("#link-picker-list");
+
+    // Image-link autocomplete
+    const imgAutocomplete     = $("#image-autocomplete");
+    const imgAutocompleteList = $("#image-autocomplete-list");
+
+    // Image-link toolbar file picker
+    const btnImagePicker    = $("#btn-image-picker");
+    const imagePicker       = $("#image-picker");
+    const imagePickerSearch = $("#image-picker-search");
+    const imagePickerList   = $("#image-picker-list");
+
     // Upload modal
     const uploadModal   = $("#upload-modal");
     const uploadDropzone = $("#upload-dropzone");
@@ -83,6 +103,18 @@
     let imageZoom = 1;
     let isImageFile = false;
     let currentFrontmatter = null;  // parsed frontmatter object
+
+    // Wiki-link autocomplete state
+    let acActive = false;       // autocomplete is visible
+    let acStartPos = -1;        // position of the opening "[[" in editor
+    let acSelectedIdx = 0;      // highlighted item index
+    let acMatches = [];         // filtered file list for autocomplete
+
+    // Image-link autocomplete state  (![[…]])
+    let imgAcActive = false;
+    let imgAcStartPos = -1;     // position of the opening "![[" in editor
+    let imgAcSelectedIdx = 0;
+    let imgAcMatches = [];
 
     // ═══════════════════════════════════════════════════════════
     // Pane visibility helper
@@ -480,13 +512,21 @@
         }
     }
 
+    /** Get display name for a file: title if available, otherwise file name */
+    function fileDisplayName(file) {
+        return file.title || file.name;
+    }
+
     function renderFileTree() {
         fileTree.innerHTML = "";
 
-        // Filter by search
+        // Filter by search (match both title and filename)
         const searchVal = ($("#file-search")?.value || "").toLowerCase();
         const filtered = searchVal
-            ? fileList.filter(f => `${f.name}.${f.ext}`.toLowerCase().includes(searchVal))
+            ? fileList.filter(f => {
+                  const haystack = `${f.title || ""} ${f.name}.${f.ext}`.toLowerCase();
+                  return haystack.includes(searchVal);
+              })
             : fileList;
 
         if (filtered.length === 0) {
@@ -506,14 +546,17 @@
             btn.dataset.fileId = file.id;
             btn.title = `${file.name}.${file.ext}`;
 
+            const displayName = fileDisplayName(file);
+            const hasTitle = !!file.title;
+
             const icon = isImg
                 ? `<svg class="file-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>`
                 : `<svg class="file-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg>`;
 
             btn.innerHTML = `
                 ${icon}
-                <span class="file-name">${escapeHtml(file.name)}</span>
-                <span class="file-ext">.${escapeHtml(file.ext)}</span>
+                <span class="file-name">${escapeHtml(displayName)}</span>
+                ${hasTitle ? `<span class="file-ext file-ext-subtle" title="${escapeHtml(file.name)}.${escapeHtml(file.ext)}">.${escapeHtml(file.ext)}</span>` : `<span class="file-ext">.${escapeHtml(file.ext)}</span>`}
                 <button class="file-tree-delete" data-file-id="${file.id}" title="Delete file" aria-label="Delete ${file.name}.${file.ext}">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
                 </button>
@@ -565,12 +608,24 @@
                 }
                 populatePropertiesPanel(fm);
                 updateAll();
+
+                // Async backlinks — don't block file open
+                if (currentFileExt === "md") {
+                    findBacklinks(currentFileName).then(renderBacklinks);
+                }
             }
 
             btnDownload.disabled = false;
             updateStatusFileName();
             renderFileTags();
             renderFileTree();
+
+            // On mobile, close the sidebar after opening a file
+            if (window.matchMedia("(max-width: 768px)").matches) {
+                sidebar.dataset.collapsed = "true";
+                const overlay = $("#sidebar-overlay");
+                if (overlay) overlay.classList.remove("visible");
+            }
         } catch (e) {
             console.error("Failed to open file:", e);
             showToast(`Failed to open file: ${e.message}`, "error");
@@ -877,7 +932,18 @@
 
     function updateStatusFileName() {
         if (statusFileLabel) {
-            statusFileLabel.textContent = `${currentFileName}.${currentFileExt}`;
+            // Show title if the current file has one (from frontmatter or file list)
+            const fileEntry = fileList.find(f => f.id === currentFileId);
+            const displayTitle = (currentFrontmatter && currentFrontmatter.title)
+                || (fileEntry && fileEntry.title)
+                || null;
+            if (displayTitle) {
+                statusFileLabel.textContent = displayTitle;
+                statusFileLabel.title = `${currentFileName}.${currentFileExt}`;
+            } else {
+                statusFileLabel.textContent = `${currentFileName}.${currentFileExt}`;
+                statusFileLabel.title = "";
+            }
         }
     }
 
@@ -1021,6 +1087,710 @@
                 }
             });
         }
+
+        // Annotate internal links (mark broken ones)
+        annotateInternalLinks();
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // Wiki-Link Autocomplete  ([[…]] as-you-type suggestions)
+    // ═══════════════════════════════════════════════════════════
+
+    /**
+     * Get markdown-only files sorted alphabetically for link suggestions.
+     */
+    function getLinkableFiles() {
+        return fileList
+            .filter(f => f.ext === "md")
+            .sort((a, b) => a.name.localeCompare(b.name));
+    }
+
+    /**
+     * Open the autocomplete popup at the cursor position.
+     */
+    function acOpen(startPos) {
+        acActive = true;
+        acStartPos = startPos;
+        acSelectedIdx = 0;
+        acUpdate();
+        linkAutocomplete.hidden = false;
+        positionAutocomplete();
+    }
+
+    /**
+     * Close the autocomplete popup.
+     */
+    function acClose() {
+        acActive = false;
+        acStartPos = -1;
+        acMatches = [];
+        linkAutocomplete.hidden = true;
+    }
+
+    /**
+     * Update the match list based on what the user has typed after "[[".
+     */
+    function acUpdate() {
+        const query = editor.value.slice(acStartPos + 2, editor.selectionStart).toLowerCase();
+        const files = getLinkableFiles();
+        acMatches = query
+            ? files.filter(f => f.name.toLowerCase().includes(query))
+            : files;
+        acSelectedIdx = Math.min(acSelectedIdx, Math.max(0, acMatches.length - 1));
+        acRender();
+    }
+
+    /**
+     * Render the autocomplete list items.
+     */
+    function acRender() {
+        if (acMatches.length === 0) {
+            linkAutocompleteList.innerHTML = `<div class="link-ac-empty">No matching pages</div>`;
+            return;
+        }
+        linkAutocompleteList.innerHTML = acMatches.map((f, i) => {
+            const active = i === acSelectedIdx ? " link-ac-item--active" : "";
+            return `<div class="link-ac-item${active}" role="option" data-idx="${i}">
+                <span class="link-ac-name">${escapeHtml(f.name)}</span>
+                <span class="link-ac-ext">.${escapeHtml(f.ext)}</span>
+            </div>`;
+        }).join("");
+
+        // Scroll active item into view
+        const activeEl = linkAutocompleteList.querySelector(".link-ac-item--active");
+        if (activeEl) activeEl.scrollIntoView({ block: "nearest" });
+    }
+
+    /**
+     * Position the autocomplete popup near the cursor in the textarea.
+     * Uses a mirror div for accurate caret coordinate calculation.
+     */
+    function positionAutocomplete() {
+        const coords = getCaretCoordinates();
+        if (coords) {
+            linkAutocomplete.style.left = coords.left + "px";
+            linkAutocomplete.style.top  = coords.top  + "px";
+        }
+    }
+
+    /**
+     * Calculate caret coordinates in the textarea using a mirror element.
+     */
+    function getCaretCoordinates() {
+        const mirror = document.createElement("div");
+        const style = getComputedStyle(editor);
+        const props = [
+            "fontFamily","fontSize","fontWeight","lineHeight","letterSpacing",
+            "wordSpacing","textIndent","whiteSpace","wordWrap","overflowWrap",
+            "paddingTop","paddingLeft","paddingRight","paddingBottom",
+            "borderTopWidth","borderLeftWidth","borderRightWidth","borderBottomWidth",
+            "boxSizing","tabSize"
+        ];
+        props.forEach(p => mirror.style[p] = style[p]);
+        mirror.style.position = "absolute";
+        mirror.style.visibility = "hidden";
+        mirror.style.overflow = "hidden";
+        mirror.style.width = editor.clientWidth + "px";
+        mirror.style.height = "auto";
+
+        const text = editor.value.substring(0, editor.selectionStart);
+        mirror.textContent = text;
+        const span = document.createElement("span");
+        span.textContent = "|";
+        mirror.appendChild(span);
+        document.body.appendChild(mirror);
+
+        const container = editor.closest(".editor-container");
+        const containerRect = container.getBoundingClientRect();
+        const editorRect = editor.getBoundingClientRect();
+        const scrollTop = editor.scrollTop;
+
+        const caretLeft = span.offsetLeft;
+        const caretTop = span.offsetTop;
+
+        document.body.removeChild(mirror);
+
+        // Position relative to the editor-container
+        const left = (editorRect.left - containerRect.left) + caretLeft;
+        const top  = (editorRect.top  - containerRect.top)  + caretTop - scrollTop + parseInt(style.lineHeight || 20);
+
+        return { left: Math.min(left, containerRect.width - 260), top };
+    }
+
+    /**
+     * Accept the currently highlighted autocomplete suggestion.
+     */
+    function acAccept() {
+        if (!acActive || acMatches.length === 0) return;
+        const file = acMatches[acSelectedIdx];
+        const before = editor.value.substring(0, acStartPos);
+        const after  = editor.value.substring(editor.selectionStart);
+        const insert = `[[${file.name}]]`;
+        editor.value = before + insert + after;
+        const newPos = acStartPos + insert.length;
+        editor.setSelectionRange(newPos, newPos);
+        editor.focus();
+        acClose();
+        onEditorInput();
+    }
+
+    /**
+     * Handle input events to detect [[ and update autocomplete.
+     */
+    function acHandleInput() {
+        const pos = editor.selectionStart;
+        const val = editor.value;
+
+        // Don't activate wiki-link autocomplete if image autocomplete is active
+        if (imgAcActive) return;
+
+        if (acActive) {
+            // Check if cursor moved before the trigger or "]]" was typed
+            if (pos <= acStartPos + 1 || val.substring(acStartPos, pos).includes("]]") || val.substring(acStartPos, pos).includes("\n")) {
+                acClose();
+                return;
+            }
+            acUpdate();
+            positionAutocomplete();
+            return;
+        }
+
+        // Detect "[[" trigger — look at the two characters just before the cursor
+        // But NOT if preceded by "!" (that's an image link ![[)
+        if (pos >= 2 && val[pos - 2] === "[" && val[pos - 1] === "[") {
+            if (pos >= 3 && val[pos - 3] === "!") return; // image link, not wiki-link
+            acOpen(pos - 2);
+        }
+    }
+
+    /**
+     * Handle keyboard navigation in the autocomplete popup.
+     * Returns true if the event was consumed.
+     */
+    function acHandleKeydown(e) {
+        if (!acActive) return false;
+
+        if (e.key === "ArrowDown") {
+            e.preventDefault();
+            acSelectedIdx = Math.min(acSelectedIdx + 1, acMatches.length - 1);
+            acRender();
+            return true;
+        }
+        if (e.key === "ArrowUp") {
+            e.preventDefault();
+            acSelectedIdx = Math.max(acSelectedIdx - 1, 0);
+            acRender();
+            return true;
+        }
+        if (e.key === "Enter" || e.key === "Tab") {
+            e.preventDefault();
+            acAccept();
+            return true;
+        }
+        if (e.key === "Escape") {
+            e.preventDefault();
+            acClose();
+            return true;
+        }
+        return false;
+    }
+
+    // Click on autocomplete item
+    linkAutocompleteList.addEventListener("click", (e) => {
+        const item = e.target.closest(".link-ac-item");
+        if (!item) return;
+        acSelectedIdx = parseInt(item.dataset.idx, 10);
+        acAccept();
+    });
+
+    // ═══════════════════════════════════════════════════════════
+    // Toolbar Wiki-Link File Picker (📄+ button)
+    // ═══════════════════════════════════════════════════════════
+
+    function openLinkPicker() {
+        linkPicker.hidden = false;
+        linkPickerSearch.value = "";
+        renderLinkPicker("");
+        // Position is already relative to button via CSS
+        requestAnimationFrame(() => linkPickerSearch.focus());
+    }
+
+    function closeLinkPicker() {
+        linkPicker.hidden = true;
+    }
+
+    function renderLinkPicker(query) {
+        const files = getLinkableFiles();
+        const q = query.toLowerCase();
+        const filtered = q ? files.filter(f => f.name.toLowerCase().includes(q)) : files;
+
+        if (filtered.length === 0) {
+            linkPickerList.innerHTML = `<div class="link-ac-empty">No matching pages</div>`;
+            return;
+        }
+        linkPickerList.innerHTML = filtered.map(f =>
+            `<div class="link-picker-item" data-file-id="${f.id}" data-file-name="${escapeHtml(f.name)}">
+                <svg class="link-picker-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg>
+                <span class="link-picker-name">${escapeHtml(f.name)}</span>
+            </div>`
+        ).join("");
+    }
+
+    function insertWikiLink(fileName) {
+        const start = editor.selectionStart;
+        const end   = editor.selectionEnd;
+        const selected = editor.value.substring(start, end);
+        const before = editor.value.substring(0, start);
+        const after  = editor.value.substring(end);
+
+        // If text is selected, use it as display and fileName as target
+        const insert = selected
+            ? `[[${fileName}|${selected}]]`
+            : `[[${fileName}]]`;
+
+        editor.value = before + insert + after;
+        const newPos = start + insert.length;
+        editor.setSelectionRange(newPos, newPos);
+        editor.focus();
+        closeLinkPicker();
+        onEditorInput();
+    }
+
+    btnWikiLink.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (linkPicker.hidden) {
+            openLinkPicker();
+        } else {
+            closeLinkPicker();
+        }
+    });
+
+    linkPickerSearch.addEventListener("input", () => {
+        renderLinkPicker(linkPickerSearch.value);
+    });
+
+    linkPickerList.addEventListener("click", (e) => {
+        const item = e.target.closest(".link-picker-item");
+        if (!item) return;
+        insertWikiLink(item.dataset.fileName);
+    });
+
+    // Close picker on outside click
+    document.addEventListener("click", (e) => {
+        if (!linkPicker.hidden && !e.target.closest("#link-picker") && !e.target.closest("#btn-wiki-link")) {
+            closeLinkPicker();
+        }
+    });
+
+    // Keyboard navigation inside link picker
+    linkPickerSearch.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") {
+            closeLinkPicker();
+            editor.focus();
+            return;
+        }
+        if (e.key === "Enter") {
+            const first = linkPickerList.querySelector(".link-picker-item");
+            if (first) insertWikiLink(first.dataset.fileName);
+            return;
+        }
+        if (e.key === "ArrowDown") {
+            e.preventDefault();
+            const first = linkPickerList.querySelector(".link-picker-item");
+            if (first) first.focus();
+        }
+    });
+
+    // ═══════════════════════════════════════════════════════════
+    // Image-Link Autocomplete  (![[…]] as-you-type suggestions)
+    // ═══════════════════════════════════════════════════════════
+
+    /**
+     * Get image files sorted alphabetically for image link suggestions.
+     */
+    function getImageFiles() {
+        return fileList
+            .filter(f => IMAGE_EXTS.has(f.ext.toLowerCase()))
+            .sort((a, b) => a.name.localeCompare(b.name));
+    }
+
+    /**
+     * Resolve an image link target to a file in fileList.
+     * Handles: "name.jpg", "name", case-insensitively.
+     */
+    function resolveImageLink(target) {
+        if (!target) return null;
+        const t = target.trim().toLowerCase();
+        // Strip any known image extension for base-name matching
+        const tBase = t.replace(/\.(png|jpe?g|gif|bmp|webp|svg|ico|avif)$/i, "");
+        return fileList.find(f => {
+            if (!IMAGE_EXTS.has(f.ext.toLowerCase())) return false;
+            const name = f.name.toLowerCase();
+            const full = `${name}.${f.ext}`.toLowerCase();
+            return full === t || name === t || name === tBase || full === tBase;
+        }) || null;
+    }
+
+    function imgAcOpen(startPos) {
+        imgAcActive = true;
+        imgAcStartPos = startPos;
+        imgAcSelectedIdx = 0;
+        imgAcUpdate();
+        imgAutocomplete.hidden = false;
+        positionImgAutocomplete();
+    }
+
+    function imgAcClose() {
+        imgAcActive = false;
+        imgAcStartPos = -1;
+        imgAcMatches = [];
+        imgAutocomplete.hidden = true;
+    }
+
+    function imgAcUpdate() {
+        const query = editor.value.slice(imgAcStartPos + 3, editor.selectionStart).toLowerCase();
+        const files = getImageFiles();
+        imgAcMatches = query
+            ? files.filter(f => {
+                const full = `${f.name}.${f.ext}`.toLowerCase();
+                return full.includes(query) || f.name.toLowerCase().includes(query);
+            })
+            : files;
+        imgAcSelectedIdx = Math.min(imgAcSelectedIdx, Math.max(0, imgAcMatches.length - 1));
+        imgAcRender();
+    }
+
+    function imgAcRender() {
+        if (imgAcMatches.length === 0) {
+            imgAutocompleteList.innerHTML = `<div class="link-ac-empty">No matching images</div>`;
+            return;
+        }
+        imgAutocompleteList.innerHTML = imgAcMatches.map((f, i) => {
+            const active = i === imgAcSelectedIdx ? " link-ac-item--active" : "";
+            const thumbUrl = `/api/files/${f.id}/raw`;
+            return `<div class="link-ac-item${active}" role="option" data-idx="${i}">
+                <img class="link-ac-thumb" src="${thumbUrl}" alt="" loading="lazy">
+                <span class="link-ac-name">${escapeHtml(f.name)}</span>
+                <span class="link-ac-ext">.${escapeHtml(f.ext)}</span>
+            </div>`;
+        }).join("");
+        const activeEl = imgAutocompleteList.querySelector(".link-ac-item--active");
+        if (activeEl) activeEl.scrollIntoView({ block: "nearest" });
+    }
+
+    function positionImgAutocomplete() {
+        const coords = getCaretCoordinates();
+        if (coords) {
+            imgAutocomplete.style.left = coords.left + "px";
+            imgAutocomplete.style.top  = coords.top  + "px";
+        }
+    }
+
+    function imgAcAccept() {
+        if (!imgAcActive || imgAcMatches.length === 0) return;
+        const file = imgAcMatches[imgAcSelectedIdx];
+        const before = editor.value.substring(0, imgAcStartPos);
+        const after  = editor.value.substring(editor.selectionStart);
+        const insert = `![[${file.name}.${file.ext}]]`;
+        editor.value = before + insert + after;
+        const newPos = imgAcStartPos + insert.length;
+        editor.setSelectionRange(newPos, newPos);
+        editor.focus();
+        imgAcClose();
+        onEditorInput();
+    }
+
+    function imgAcHandleInput() {
+        const pos = editor.selectionStart;
+        const val = editor.value;
+
+        if (imgAcActive) {
+            if (pos <= imgAcStartPos + 2 || val.substring(imgAcStartPos, pos).includes("]]") || val.substring(imgAcStartPos, pos).includes("\n")) {
+                imgAcClose();
+                return;
+            }
+            imgAcUpdate();
+            positionImgAutocomplete();
+            return;
+        }
+
+        // Detect "![[" trigger
+        if (pos >= 3 && val[pos - 3] === "!" && val[pos - 2] === "[" && val[pos - 1] === "[") {
+            imgAcOpen(pos - 3);
+        }
+    }
+
+    function imgAcHandleKeydown(e) {
+        if (!imgAcActive) return false;
+        if (e.key === "ArrowDown") {
+            e.preventDefault();
+            imgAcSelectedIdx = Math.min(imgAcSelectedIdx + 1, imgAcMatches.length - 1);
+            imgAcRender();
+            return true;
+        }
+        if (e.key === "ArrowUp") {
+            e.preventDefault();
+            imgAcSelectedIdx = Math.max(imgAcSelectedIdx - 1, 0);
+            imgAcRender();
+            return true;
+        }
+        if (e.key === "Enter" || e.key === "Tab") {
+            e.preventDefault();
+            imgAcAccept();
+            return true;
+        }
+        if (e.key === "Escape") {
+            e.preventDefault();
+            imgAcClose();
+            return true;
+        }
+        return false;
+    }
+
+    imgAutocompleteList.addEventListener("click", (e) => {
+        const item = e.target.closest(".link-ac-item");
+        if (!item) return;
+        imgAcSelectedIdx = parseInt(item.dataset.idx, 10);
+        imgAcAccept();
+    });
+
+    // ═══════════════════════════════════════════════════════════
+    // Toolbar Image-Link File Picker (🖼 button)
+    // ═══════════════════════════════════════════════════════════
+
+    function openImagePicker() {
+        imagePicker.hidden = false;
+        imagePickerSearch.value = "";
+        renderImagePicker("");
+        requestAnimationFrame(() => imagePickerSearch.focus());
+    }
+
+    function closeImagePicker() {
+        imagePicker.hidden = true;
+    }
+
+    function renderImagePicker(query) {
+        const files = getImageFiles();
+        const q = query.toLowerCase();
+        const filtered = q
+            ? files.filter(f => `${f.name}.${f.ext}`.toLowerCase().includes(q) || f.name.toLowerCase().includes(q))
+            : files;
+
+        if (filtered.length === 0) {
+            imagePickerList.innerHTML = `<div class="link-ac-empty">No matching images</div>`;
+            return;
+        }
+        imagePickerList.innerHTML = filtered.map(f => {
+            const thumbUrl = `/api/files/${f.id}/raw`;
+            return `<div class="link-picker-item" data-file-name="${escapeHtml(f.name)}.${escapeHtml(f.ext)}">
+                <img class="link-picker-thumb" src="${thumbUrl}" alt="" loading="lazy">
+                <span class="link-picker-name">${escapeHtml(f.name)}.${escapeHtml(f.ext)}</span>
+            </div>`;
+        }).join("");
+    }
+
+    function insertImageLink(fileName) {
+        const start = editor.selectionStart;
+        const end   = editor.selectionEnd;
+        const selected = editor.value.substring(start, end);
+        const before = editor.value.substring(0, start);
+        const after  = editor.value.substring(end);
+
+        // If text selected, use it as alt text
+        const insert = selected
+            ? `![[${fileName}|${selected}]]`
+            : `![[${fileName}]]`;
+
+        editor.value = before + insert + after;
+        const newPos = start + insert.length;
+        editor.setSelectionRange(newPos, newPos);
+        editor.focus();
+        closeImagePicker();
+        onEditorInput();
+    }
+
+    btnImagePicker.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (imagePicker.hidden) {
+            openImagePicker();
+        } else {
+            closeImagePicker();
+        }
+    });
+
+    imagePickerSearch.addEventListener("input", () => {
+        renderImagePicker(imagePickerSearch.value);
+    });
+
+    imagePickerList.addEventListener("click", (e) => {
+        const item = e.target.closest(".link-picker-item");
+        if (!item) return;
+        insertImageLink(item.dataset.fileName);
+    });
+
+    document.addEventListener("click", (e) => {
+        if (!imagePicker.hidden && !e.target.closest("#image-picker") && !e.target.closest("#btn-image-picker")) {
+            closeImagePicker();
+        }
+    });
+
+    imagePickerSearch.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") {
+            closeImagePicker();
+            editor.focus();
+            return;
+        }
+        if (e.key === "Enter") {
+            const first = imagePickerList.querySelector(".link-picker-item");
+            if (first) insertImageLink(first.dataset.fileName);
+            return;
+        }
+        if (e.key === "ArrowDown") {
+            e.preventDefault();
+            const first = imagePickerList.querySelector(".link-picker-item");
+            if (first) first.focus();
+        }
+    });
+
+    // ═══════════════════════════════════════════════════════════
+    // Backlinks (shown in preview when a file is open)
+    // ═══════════════════════════════════════════════════════════
+
+    /**
+     * Find all files that link to the current file via [[name]] or [text](name).
+     * Fetches content in parallel for speed.
+     */
+    async function findBacklinks(targetName) {
+        const targetLower = targetName.toLowerCase();
+        const candidates = fileList.filter(f => f.id !== currentFileId && f.ext === "md");
+        if (candidates.length === 0) return [];
+
+        const results = await Promise.allSettled(
+            candidates.map(f => apiGet(`/files/${f.id}`).then(data => ({ f, content: (data.content || "").toLowerCase() })))
+        );
+
+        const backlinks = [];
+        for (const r of results) {
+            if (r.status !== "fulfilled") continue;
+            const { f, content } = r.value;
+            if (
+                content.includes(`[[${targetLower}`)   ||
+                content.includes(`[[${targetLower}|`)   ||
+                content.includes(`(${targetLower})`)    ||
+                content.includes(`(${targetLower}.md)`)
+            ) {
+                backlinks.push({ id: f.id, name: f.name });
+            }
+        }
+        return backlinks;
+    }
+
+    function renderBacklinks(backlinks) {
+        const existing = preview.querySelector(".backlinks-section");
+        if (existing) existing.remove();
+
+        if (backlinks.length === 0) return;
+
+        const section = document.createElement("div");
+        section.className = "backlinks-section";
+        section.innerHTML = `
+            <h4 class="backlinks-title">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 17H7A5 5 0 0 1 7 7h2"/><path d="M15 7h2a5 5 0 1 1 0 10h-2"/><line x1="8" x2="16" y1="12" y2="12"/></svg>
+                Linked by ${backlinks.length} page${backlinks.length > 1 ? "s" : ""}
+            </h4>
+            <ul class="backlinks-list">
+                ${backlinks.map(bl => `<li><a href="#" class="md-internal-link backlink-item" data-target="${escapeHtml(bl.name)}">${escapeHtml(bl.name)}</a></li>`).join("")}
+            </ul>
+        `;
+        preview.appendChild(section);
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // Internal Link Resolution
+    // ═══════════════════════════════════════════════════════════
+
+    /**
+     * Resolve an internal link target string to a file in fileList.
+     * Handles: "name", "name.md", "Name", case-insensitively.
+     * Returns the file object or null.
+     */
+    function resolveInternalLink(target) {
+        if (!target) return null;
+        const t = target.trim().toLowerCase();
+        const tNoExt = t.replace(/\.md$/, "");
+        return fileList.find(f => {
+            const name = f.name.toLowerCase();
+            const full = `${name}.${f.ext}`;
+            return name === tNoExt || full === t || name === t || full === tNoExt;
+        }) || null;
+    }
+
+    /**
+     * After rendering preview, annotate broken internal links
+     * with a CSS class so they're visually distinct.
+     * Also resolve image wiki-links (![[image]]) to actual <img> src URLs.
+     */
+    function annotateInternalLinks() {
+        preview.querySelectorAll(".md-internal-link").forEach(link => {
+            const target = link.dataset.target;
+            const resolved = resolveInternalLink(target);
+            if (resolved) {
+                link.classList.remove("md-link-broken");
+                link.title = `Go to: ${resolved.name}.${resolved.ext}`;
+            } else {
+                link.classList.add("md-link-broken");
+                link.title = `Page not found: ${target} — click to create`;
+            }
+        });
+
+        // Resolve image wiki-links
+        preview.querySelectorAll("img.md-image-link").forEach(img => {
+            const target = img.dataset.target;
+            const resolved = resolveImageLink(target);
+            if (resolved) {
+                img.src = `/api/files/${resolved.id}/raw`;
+                img.classList.remove("md-image-broken");
+                img.title = `${resolved.name}.${resolved.ext}`;
+            } else {
+                img.removeAttribute("src");
+                img.classList.add("md-image-broken");
+                img.title = `Image not found: ${target}`;
+                img.alt = `⚠ ${target} (not found)`;
+            }
+        });
+    }
+
+    /**
+     * Create a new markdown page from a broken link click.
+     */
+    async function createLinkedPage(name) {
+        const cleanName = name.replace(/\.md$/, "").trim();
+        if (!cleanName) return;
+
+        try {
+            const today = new Date().toISOString().slice(0, 10);
+            const initialContent = serializeFrontmatter({
+                title: cleanName,
+                description: "",
+                tags: [],
+                date: today,
+                last_mod: today,
+                visibility: "public",
+            }, "");
+
+            const file = await apiPost("/files", {
+                name: cleanName,
+                ext: "md",
+                mime: "text/markdown",
+                content: initialContent,
+            });
+
+            await loadFileList();
+            showToast(`Created page: ${cleanName}`, "success");
+            openFile(file.id);
+        } catch (e) {
+            showToast(`Failed to create page: ${e.message}`, "error");
+        }
     }
 
     // Handle internal markdown link clicks in preview
@@ -1032,19 +1802,14 @@
         const target = link.dataset.target;
         if (!target) return;
 
-        const targetClean = target.replace(/\.md$/, "").toLowerCase();
-
-        const match = fileList.find(f => {
-            const full = `${f.name}.${f.ext}`.toLowerCase();
-            const nameOnly = f.name.toLowerCase();
-            return full === targetClean || nameOnly === targetClean ||
-                   full === target.toLowerCase() || nameOnly === target.toLowerCase();
-        });
-
+        const match = resolveInternalLink(target);
         if (match) {
             openFile(match.id);
         } else {
-            showToast(`Page not found: ${target}`, "error");
+            // Offer to create the missing page
+            if (confirm(`Page "${target}" doesn't exist.\n\nCreate it?`)) {
+                createLinkedPage(target);
+            }
         }
     });
 
@@ -1096,8 +1861,53 @@
         editorPanes.dataset.view = mode;
         viewModeSelect.value = mode;
 
+        // Update mobile pane toggle icon
+        updateMobilePaneToggle(mode);
+
         if (mode === "preview" || mode === "split") {
             updatePreview();
+        }
+    }
+
+    /** Update the mobile pane toggle button icon and label */
+    function updateMobilePaneToggle(mode) {
+        const toggleBtn = $("#btn-mobile-pane-toggle");
+        if (!toggleBtn) return;
+        if (mode === "preview") {
+            toggleBtn.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>`;
+            toggleBtn.title = "Switch to editor";
+        } else {
+            toggleBtn.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>`;
+            toggleBtn.title = "Switch to preview";
+        }
+    }
+
+    /** Init mobile pane toggle — switch between editor and preview on narrow screens */
+    function initMobilePaneToggle() {
+        const toggleBtn = $("#btn-mobile-pane-toggle");
+        if (!toggleBtn) return;
+
+        toggleBtn.addEventListener("click", () => {
+            const current = editorPanes.dataset.view;
+            if (current === "preview") {
+                setViewMode("editor");
+            } else {
+                setViewMode("preview");
+            }
+        });
+
+        // On mobile, default to editor-only
+        const mq = window.matchMedia("(max-width: 768px)");
+        function handleMq(e) {
+            if (e.matches) {
+                if (editorPanes.dataset.view === "split") {
+                    setViewMode("editor");
+                }
+            }
+        }
+        mq.addEventListener("change", handleMq);
+        if (mq.matches) {
+            setViewMode("editor");
         }
     }
 
@@ -1107,6 +1917,109 @@
     function toggleSidebar() {
         const collapsed = sidebar.dataset.collapsed === "true";
         sidebar.dataset.collapsed = !collapsed ? "true" : "false";
+
+        // On mobile, also toggle overlay
+        if (window.matchMedia("(max-width: 768px)").matches) {
+            const overlay = $("#sidebar-overlay");
+            if (overlay) {
+                overlay.classList.toggle("visible", collapsed); // show when opening
+            }
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // Sidebar Resize (drag handle)
+    // ═══════════════════════════════════════════════════════════
+    function initSidebarResize() {
+        const handle = $("#sidebar-resize-handle");
+        if (!handle) return;
+
+        let isDragging = false;
+
+        // Restore saved width
+        const saved = localStorage.getItem("synker-sidebar-width");
+        if (saved) {
+            const w = parseInt(saved, 10);
+            if (w >= 150 && w <= 600) {
+                sidebar.style.width = w + "px";
+                sidebar.style.minWidth = w + "px";
+            }
+        }
+
+        handle.addEventListener("pointerdown", (e) => {
+            // Don't resize if sidebar is collapsed
+            if (sidebar.dataset.collapsed === "true") return;
+
+            isDragging = true;
+            handle.classList.add("dragging");
+            handle.setPointerCapture(e.pointerId);
+            document.body.style.cursor = "col-resize";
+            document.body.style.userSelect = "none";
+            e.preventDefault();
+        });
+
+        document.addEventListener("pointermove", (e) => {
+            if (!isDragging) return;
+
+            const newWidth = Math.max(150, Math.min(600, e.clientX));
+            sidebar.style.width = newWidth + "px";
+            sidebar.style.minWidth = newWidth + "px";
+        });
+
+        document.addEventListener("pointerup", () => {
+            if (!isDragging) return;
+            isDragging = false;
+            handle.classList.remove("dragging");
+            document.body.style.cursor = "";
+            document.body.style.userSelect = "";
+
+            // Save to localStorage
+            const w = parseInt(sidebar.style.width, 10);
+            if (w) {
+                localStorage.setItem("synker-sidebar-width", w);
+            }
+        });
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // Responsive Sidebar (mobile overlay + auto-collapse)
+    // ═══════════════════════════════════════════════════════════
+    function initResponsiveSidebar() {
+        const overlay = $("#sidebar-overlay");
+        const mobileFab = $("#btn-mobile-sidebar");
+
+        // Overlay click closes sidebar
+        if (overlay) {
+            overlay.addEventListener("click", () => {
+                sidebar.dataset.collapsed = "true";
+                overlay.classList.remove("visible");
+            });
+        }
+
+        // Mobile FAB opens sidebar
+        if (mobileFab) {
+            mobileFab.addEventListener("click", () => {
+                const isCollapsed = sidebar.dataset.collapsed === "true";
+                sidebar.dataset.collapsed = isCollapsed ? "false" : "true";
+                if (overlay) {
+                    overlay.classList.toggle("visible", isCollapsed);
+                }
+            });
+        }
+
+        // Auto-collapse sidebar on narrow viewport
+        const mq = window.matchMedia("(max-width: 768px)");
+        function handleMq(e) {
+            if (e.matches) {
+                sidebar.dataset.collapsed = "true";
+                if (overlay) overlay.classList.remove("visible");
+            }
+        }
+        mq.addEventListener("change", handleMq);
+        // Initial check
+        if (mq.matches) {
+            sidebar.dataset.collapsed = "true";
+        }
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -1160,6 +2073,19 @@
             "`": "code",
         };
 
+        if (e.key === "l") {
+            e.preventDefault();
+            openLinkPicker();
+            return;
+        }
+
+        // Ctrl+Shift+I — open image picker
+        if (e.key === "I" && e.shiftKey) {
+            e.preventDefault();
+            openImagePicker();
+            return;
+        }
+
         if (e.key === "p") {
             e.preventDefault();
             const current = editorPanes.dataset.view;
@@ -1181,6 +2107,9 @@
     }
 
     function handleTab(e) {
+        // Let autocomplete handle Tab/Enter/Arrow keys first
+        if (acHandleKeydown(e)) return;
+        if (imgAcHandleKeydown(e)) return;
         if (e.key !== "Tab") return;
         e.preventDefault();
 
@@ -1216,6 +2145,12 @@
         updateStats();
         updateModified();
         updateCursorStatus();
+
+        // Image-link autocomplete detection (must run before wiki-link)
+        imgAcHandleInput();
+
+        // Wiki-link autocomplete detection
+        acHandleInput();
 
         clearTimeout(previewTimer);
         previewTimer = setTimeout(updatePreview, 150);
@@ -1267,12 +2202,17 @@
         updateStats();
         updateCursorStatus();
         initResizer();
+        initSidebarResize();
+        initResponsiveSidebar();
+        initMobilePaneToggle();
 
         // Editor events
         editor.addEventListener("input", onEditorInput);
         editor.addEventListener("click", () => {
             updateCursorStatus();
             updateLineNumbers();
+            // Close autocomplete if user clicks elsewhere
+            if (acActive) acClose();
         });
         editor.addEventListener("keyup", (e) => {
             if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Home","End"].includes(e.key)) {
@@ -1491,14 +2431,17 @@
             btn.dataset.fileId = file.id;
             btn.title = `${file.name}.${file.ext}`;
 
+            const displayName = fileDisplayName(file);
+            const hasTitle = !!file.title;
+
             const icon = isImg
                 ? `<svg class="file-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>`
                 : `<svg class="file-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg>`;
 
             btn.innerHTML = `
                 ${icon}
-                <span class="file-name">${escapeHtml(file.name)}</span>
-                <span class="file-ext">.${escapeHtml(file.ext)}</span>
+                <span class="file-name">${escapeHtml(displayName)}</span>
+                ${hasTitle ? `<span class="file-ext file-ext-subtle" title="${escapeHtml(file.name)}.${escapeHtml(file.ext)}">.${escapeHtml(file.ext)}</span>` : `<span class="file-ext">.${escapeHtml(file.ext)}</span>`}
                 <button class="file-tree-delete" data-file-id="${file.id}" title="Delete file" aria-label="Delete ${file.name}.${file.ext}">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
                 </button>
