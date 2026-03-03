@@ -285,29 +285,29 @@ impl FileManager for FsFileManager {
             .into_iter()
             .filter(|m| {
                 // Extension filter
-                if let Some(ref ext) = query.extension {
-                    if !m.ext.eq_ignore_ascii_case(ext) {
-                        return false;
-                    }
+                if let Some(ref ext) = query.extension
+                    && !m.ext.eq_ignore_ascii_case(ext)
+                {
+                    return false;
                 }
 
                 // Name contains
-                if let Some(ref name) = query.name_contains {
-                    if !m.name.to_lowercase().contains(&name.to_lowercase()) {
-                        return false;
-                    }
+                if let Some(ref name) = query.name_contains
+                    && !m.name.to_lowercase().contains(&name.to_lowercase())
+                {
+                    return false;
                 }
 
                 // Size filters
-                if let Some(min) = query.size_greater_than {
-                    if m.size < min {
-                        return false;
-                    }
+                if let Some(min) = query.size_greater_than
+                    && m.size < min
+                {
+                    return false;
                 }
-                if let Some(max) = query.size_smaller_than {
-                    if m.size > max {
-                        return false;
-                    }
+                if let Some(max) = query.size_smaller_than
+                    && m.size > max
+                {
+                    return false;
                 }
 
                 // Tag filter
@@ -324,15 +324,15 @@ impl FileManager for FsFileManager {
             .collect();
 
         // Content search (need to read files)
-        if query.file_contains.is_some() {
-            let search_term = query.file_contains.as_ref().unwrap().to_lowercase();
+        if let Some(file_contains) = &query.file_contains {
+            let search_term = file_contains.to_lowercase();
             let mut content_results = Vec::new();
             for m in &results {
                 let file_path = self.file_path(m.id, &m.ext);
-                if let Ok(content) = fs::read_to_string(&file_path) {
-                    if content.to_lowercase().contains(&search_term) {
-                        content_results.push(m.clone());
-                    }
+                if let Ok(content) = fs::read_to_string(&file_path)
+                    && content.to_lowercase().contains(&search_term)
+                {
+                    content_results.push(m.clone());
                 }
             }
             return Ok(content_results);
