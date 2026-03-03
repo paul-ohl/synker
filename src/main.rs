@@ -1,4 +1,4 @@
 #[tokio::main]
 async fn main() {
-    synker::inbound::server::setup::server().await;
+    synker::inbound::cli::read_arguments::dispatch().await;
 }
