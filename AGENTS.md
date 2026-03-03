@@ -69,3 +69,5 @@ The project follows a Hexagonal Architecture pattern to decouple business logic 
 - **Respect Boundaries:** Do not leak infrastructure details (like Axum types or IO errors) into the `domain` layer.
 - **Verify:** Run `cargo check` and `cargo clippy` after every modification to ensure type safety and idiomaticity.
 - **Tests:** When adding features, add corresponding tests in the `tests` module.
+- **Environnement variables:** Never ever interact with the `.env` file. You are not allowed to read or edit it. If you need to add or modify environment variables that will be set in the `.env` file, you should edit the `.env.example` file instead, which you are allowed to read and edit. Always put bogus data in there.
+- **Committing:** Never commit automatically. Always ask for explicit confirmation from the user.

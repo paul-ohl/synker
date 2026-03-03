@@ -12,12 +12,19 @@ use crate::domain::{
 pub struct GitSynchronizer {
     remote: String,
     branch: String,
+    repo_path: String,
+    user_email: String,
 }
 
 impl GitSynchronizer {
     /// Creates a new instance of `GitSynchronizer`.
-    pub fn new(remote: String, branch: String) -> Self {
-        GitSynchronizer { remote, branch }
+    pub fn new(remote: String, branch: String, repo_path: String, user_email: String) -> Self {
+        GitSynchronizer {
+            remote,
+            branch,
+            repo_path,
+            user_email,
+        }
     }
 
     /// Stages all changes in the repository, equivalent to `git add -A`.
@@ -51,7 +58,7 @@ impl GitSynchronizer {
         repo: &Repository,
         message: &str,
     ) -> Result<git2::Oid, SynchronisationError> {
-        let signature = git2::Signature::now("AutoSync", "autosync@synker.dev")?;
+        let signature = git2::Signature::now("AutoSync", &self.user_email)?;
         let mut index = repo.index()?;
         let tree_id = index.write_tree()?;
         let tree = repo.find_tree(tree_id)?;
@@ -82,7 +89,7 @@ impl GitSynchronizer {
         let annotated_fetch_commit = repo.find_annotated_commit(fetch_commit.id())?;
 
         let mut rebase = repo.rebase(None, Some(&annotated_fetch_commit), None, None)?;
-        let signature = git2::Signature::now("AutoSync", "autosync@synker.dev")?;
+        let signature = git2::Signature::now("AutoSync", &self.user_email)?;
 
         while let Some(op) = rebase.next() {
             match op {
@@ -120,7 +127,7 @@ impl GitSynchronizer {
 impl ports::Synchronisation for GitSynchronizer {
     /// Checks if there are any staged or unstaged changes in the repository.
     fn register_changes(&self) -> Result<bool, SynchronisationError> {
-        git2::Repository::discover(".")
+        git2::Repository::discover(&self.repo_path)
             .map_err(|e| SynchronisationError::SyncToolError(e.to_string()))
             .and_then(|repo| {
                 let statuses = repo
@@ -130,15 +137,15 @@ impl ports::Synchronisation for GitSynchronizer {
             })
     }
 
-    /// Synchronizes the local repository with the remote 'origin/main'.
+    /// Synchronizes the local repository with the configured remote branch.
     ///
     /// The process includes:
     /// 1. Staging all changes (`git add -A`)
     /// 2. Creating an auto-generated commit
-    /// 3. Fetching and rebasing from `origin/main`
-    /// 4. Pushing to `origin/main`
+    /// 3. Fetching and rebasing from the remote branch
+    /// 4. Pushing to the remote branch
     fn synchronise(&self) -> Result<SynchronisationReport, SynchronisationError> {
-        let repo = Repository::discover(".")?;
+        let repo = Repository::discover(&self.repo_path)?;
 
         self.add_all(&repo)?;
 
@@ -158,7 +165,7 @@ impl ports::Synchronisation for GitSynchronizer {
 
     /// Provides a report on the current synchronization state.
     fn is_synchronised(&self) -> Result<SynchronisationReport, SynchronisationError> {
-        let repo = Repository::discover(".")
+        let repo = Repository::discover(&self.repo_path)
             .map_err(|e| SynchronisationError::SyncToolError(e.to_string()))?;
 
         let head = repo.head()?.peel_to_commit()?;
