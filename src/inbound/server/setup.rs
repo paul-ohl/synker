@@ -21,7 +21,7 @@ use crate::outbound::file_system::FsFileManager;
 pub async fn server() {
     dotenv().ok();
     let port = env::var("PORT").expect("PORT environment variable not set");
-    let data_dir = env::var("DATA_DIR").unwrap_or_else(|_| "data/files".to_string());
+    let data_dir = env::var("DATA_DIR").expect("DATA_DIR environment variable not set");
     let addr = format!("0.0.0.0:{}", port);
 
     // Build the dependency graph (hexagonal wiring)
@@ -59,7 +59,10 @@ fn get_backend_routes(state: AppState) -> Router<()> {
             "/files/{id}/download",
             get(backend::download_file::download_file),
         )
-        .route("/files/{id}/raw", get(backend::serve_file_raw::serve_file_raw))
+        .route(
+            "/files/{id}/raw",
+            get(backend::serve_file_raw::serve_file_raw),
+        )
         .route("/tags", get(backend::list_tags::list_tags))
         .with_state(state)
 }
