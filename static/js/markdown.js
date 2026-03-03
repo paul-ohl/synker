@@ -183,6 +183,34 @@ window.SynkerMD = (() => {
                 }
             }
 
+            // ── Image wiki-link ![[image.jpg]] or ![[image.jpg|alt text]] ──
+            if (ch === "!" && src[i + 1] === "[" && src[i + 2] === "[") {
+                const closeIdx = src.indexOf("]]", i + 3);
+                if (closeIdx !== -1) {
+                    const inner = src.slice(i + 3, closeIdx);
+                    const pipeIdx = inner.indexOf("|");
+                    const target = pipeIdx !== -1 ? inner.slice(0, pipeIdx).trim() : inner.trim();
+                    const alt = pipeIdx !== -1 ? inner.slice(pipeIdx + 1).trim() : target;
+                    out += `<img class="md-image-link" data-target="${esc(target)}" alt="${esc(alt)}" loading="lazy">`;
+                    i = closeIdx + 2;
+                    continue;
+                }
+            }
+
+            // ── Wiki-link [[page]] or [[page|display text]] ──
+            if (ch === "[" && src[i + 1] === "[") {
+                const closeIdx = src.indexOf("]]", i + 2);
+                if (closeIdx !== -1) {
+                    const inner = src.slice(i + 2, closeIdx);
+                    const pipeIdx = inner.indexOf("|");
+                    const target = pipeIdx !== -1 ? inner.slice(0, pipeIdx).trim() : inner.trim();
+                    const display = pipeIdx !== -1 ? inner.slice(pipeIdx + 1).trim() : inner.trim();
+                    out += `<a href="#" class="md-internal-link" data-target="${esc(target)}">${esc(display)}</a>`;
+                    i = closeIdx + 2;
+                    continue;
+                }
+            }
+
             // ── Footnote reference [^id] ──
             if (ch === "[" && src[i + 1] === "^") {
                 const m = src.slice(i).match(/^\[\^([^\]]+)\]/);

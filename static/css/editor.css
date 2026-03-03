@@ -281,6 +281,216 @@
     text-decoration-style: dashed;
     cursor: pointer;
 }
+.markdown-body a.md-internal-link:hover {
+    background: var(--color-bg-overlay);
+    border-radius: var(--radius-sm);
+    padding: 1px 3px;
+    margin: -1px -3px;
+}
+.markdown-body a.md-internal-link::before {
+    content: "📄 ";
+    font-size: 0.75em;
+    vertical-align: baseline;
+    opacity: 0.6;
+}
+
+/* Broken internal link — page doesn't exist */
+.markdown-body a.md-link-broken {
+    color: var(--color-text-muted);
+    text-decoration: line-through wavy;
+    opacity: 0.7;
+}
+.markdown-body a.md-link-broken::before {
+    content: "❓ ";
+}
+.markdown-body a.md-link-broken:hover {
+    opacity: 1;
+    color: var(--color-accent);
+    text-decoration: underline dashed;
+}
+
+/* ═══ Backlinks section (bottom of preview) ═══ */
+.backlinks-section {
+    margin-top: 2rem;
+    padding-top: 1.5rem;
+    border-top: 1px dashed var(--color-border-subtle);
+}
+.backlinks-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: var(--text-sm);
+    font-weight: 600;
+    color: var(--color-text-secondary);
+    margin: 0 0 0.5rem;
+}
+.backlinks-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+.backlinks-list li { margin: 0; }
+.backlinks-list a.backlink-item {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 10px;
+    background: var(--color-bg-overlay);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-full);
+    font-size: var(--text-xs);
+    color: var(--color-accent);
+    text-decoration: none;
+    transition: background var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out);
+}
+.backlinks-list a.backlink-item:hover {
+    background: var(--color-bg-elevated);
+    border-color: var(--color-accent-muted);
+}
+
+/* ═══ Wiki-link autocomplete dropdown ═══ */
+.editor-container { position: relative; }
+
+.link-autocomplete {
+    position: absolute;
+    z-index: 100;
+    min-width: 220px;
+    max-width: 320px;
+    max-height: 240px;
+    background: var(--color-bg-elevated);
+    border: 1px solid var(--color-border-default);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+    overflow: hidden;
+}
+.link-autocomplete-list {
+    max-height: 240px;
+    overflow-y: auto;
+}
+.link-ac-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 12px;
+    cursor: pointer;
+    font-size: var(--text-sm);
+    color: var(--color-text-primary);
+    transition: background var(--duration-fast) var(--ease-out);
+}
+.link-ac-item:hover,
+.link-ac-item--active {
+    background: var(--color-bg-overlay);
+}
+.link-ac-item--active {
+    color: var(--color-accent);
+}
+.link-ac-name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.link-ac-ext {
+    color: var(--color-text-muted);
+    font-size: var(--text-xs);
+    flex-shrink: 0;
+}
+.link-ac-empty {
+    padding: 12px 16px;
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+    text-align: center;
+}
+/* Thumbnail in autocomplete / picker items */
+.link-ac-thumb,
+.link-picker-thumb {
+    width: 24px;
+    height: 24px;
+    object-fit: cover;
+    border-radius: var(--radius-sm);
+    flex-shrink: 0;
+    background: var(--color-bg-sunken);
+}
+
+/* ═══ Image wiki-link rendered in preview ═══ */
+.markdown-body img.md-image-link {
+    max-width: 100%;
+    height: auto;
+    border-radius: var(--radius-md);
+    margin: var(--space-3) 0;
+    display: block;
+}
+.markdown-body img.md-image-broken {
+    display: inline-block;
+    padding: var(--space-3) var(--space-4);
+    border: 2px dashed var(--color-danger, #e5534b);
+    border-radius: var(--radius-md);
+    color: var(--color-danger, #e5534b);
+    background: var(--color-bg-sunken);
+    font-size: var(--text-sm);
+    font-style: italic;
+    min-height: 48px;
+    min-width: 120px;
+}
+
+/* ═══ Toolbar wiki-link file picker ═══ */
+.toolbar-btn-wrapper { display: inline-flex; }
+
+.link-picker {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    margin-top: 4px;
+    z-index: 200;
+    width: 280px;
+    background: var(--color-bg-elevated);
+    border: 1px solid var(--color-border-default);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+    overflow: hidden;
+}
+.link-picker-search {
+    width: 100%;
+    padding: 8px 12px;
+    border: none;
+    border-bottom: 1px solid var(--color-border-subtle);
+    background: var(--color-bg-sunken);
+    color: var(--color-text-primary);
+    font-size: var(--text-sm);
+    font-family: var(--font-ui);
+    outline: none;
+    box-sizing: border-box;
+}
+.link-picker-search::placeholder { color: var(--color-text-muted); }
+.link-picker-search:focus { outline: none; }
+.link-picker-list {
+    max-height: 240px;
+    overflow-y: auto;
+}
+.link-picker-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 12px;
+    cursor: pointer;
+    font-size: var(--text-sm);
+    color: var(--color-text-primary);
+    transition: background var(--duration-fast) var(--ease-out);
+}
+.link-picker-item:hover {
+    background: var(--color-bg-overlay);
+    color: var(--color-accent);
+}
+.link-picker-icon {
+    flex-shrink: 0;
+    color: var(--color-text-muted);
+}
+.link-picker-name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
 
 /* Lists */
 .markdown-body ul,
@@ -459,26 +669,24 @@
    ═══════════════════════════════════════════════════════════════ */
 
 /* ═══════════════════════════════════════════════════════════════
-   Responsive — Tablet
+   Responsive — Tablet (≤ 768px)
    ═══════════════════════════════════════════════════════════════ */
 @media (max-width: 768px) {
-    .editor-panes {
-        flex-direction: column;
+    /* On mobile, force single-pane — split becomes editor-only, use FAB to toggle */
+    .editor-panes[data-view="split"] .pane-preview,
+    .editor-panes[data-view="split"] .pane-resizer {
+        display: none;
     }
-
-    .editor-panes[data-view="split"] .pane-editor,
-    .editor-panes[data-view="split"] .pane-preview {
+    .editor-panes[data-view="split"] .pane-editor {
         flex: 1;
         min-width: unset;
-        min-height: 0;
     }
 
     .editor-panes[data-view="split"] .pane-preview {
         border-left: none;
-        border-top: 1px solid var(--color-border-subtle);
     }
 
-    .editor-panes[data-view="split"] .pane-resizer {
+    .pane-resizer {
         display: none;
     }
 
@@ -497,10 +705,21 @@
     .markdown-body {
         max-width: 100%;
     }
+
+    /* Backlinks section */
+    .backlinks-section {
+        padding: var(--space-3);
+    }
+
+    /* Autocomplete / link picker */
+    .wiki-link-autocomplete,
+    .wiki-link-picker {
+        max-width: 90vw;
+    }
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   Responsive — Phone
+   Responsive — Phone (≤ 480px)
    ═══════════════════════════════════════════════════════════════ */
 @media (max-width: 480px) {
     /* On phone, default to editor-only view */
@@ -514,7 +733,7 @@
 
     .editor-textarea {
         padding: var(--space-3);
-        font-size: 14px;
+        font-size: 16px; /* prevents iOS zoom on focus */
     }
 
     .preview-content {
@@ -526,18 +745,52 @@
         max-width: 100%;
     }
 
+    .markdown-body h1 { font-size: 1.5rem; }
+    .markdown-body h2 { font-size: 1.3rem; }
+    .markdown-body h3 { font-size: 1.15rem; }
+
+    .markdown-body pre {
+        font-size: 0.8rem;
+        padding: var(--space-3);
+    }
+
+    .markdown-body table {
+        display: block;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .markdown-body img {
+        max-width: 100%;
+        height: auto;
+    }
+
     .toolbar {
         padding: 0 var(--space-1);
+        min-height: 40px;
+        flex-wrap: wrap;
     }
 
     .toolbar-btn {
-        min-width: 24px;
-        height: 24px;
-        padding: 2px 4px;
+        min-width: 32px;
+        height: 32px;
+        padding: 4px 6px;
     }
 
     .status-bar {
         padding: 0 var(--space-2);
+    }
+
+    /* Autocomplete / link picker: full width on phone */
+    .wiki-link-autocomplete,
+    .wiki-link-picker {
+        max-width: calc(100vw - var(--space-4));
+        min-width: 200px;
+    }
+
+    /* Image viewer */
+    .image-viewer-container {
+        padding: var(--space-3);
     }
 }
 

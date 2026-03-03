@@ -64,6 +64,8 @@ pub struct MetadataResponse {
     pub mime: String,
     pub created_at: String,
     pub modified_at: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -84,6 +86,7 @@ impl From<Metadata> for MetadataResponse {
             mime: m.mime,
             created_at: m.created_at,
             modified_at: m.modified_at,
+            title: None,
         }
     }
 }
@@ -164,11 +167,85 @@ pub async fn create_file(
     }
 }
 
+/// Extract the first markdown H1 heading or YAML frontmatter title from content.
+fn extract_title(content: &str) -> Option<String> {
+    let mut in_frontmatter = false;
+    let mut past_frontmatter = false;
+
+    for line in content.lines() {
+        let trimmed = line.trim();
+
+        // Handle YAML frontmatter
+        if trimmed == "---" {
+            if !in_frontmatter && !past_frontmatter {
+                in_frontmatter = true;
+                continue;
+            } else if in_frontmatter {
+                in_frontmatter = false;
+                past_frontmatter = true;
+                continue;
+            }
+        }
+
+        if in_frontmatter {
+            if let Some(rest) = trimmed.strip_prefix("title:") {
+                let title = rest.trim().trim_matches('"').trim_matches('\'').trim();
+                if !title.is_empty() {
+                    return Some(title.to_string());
+                }
+            }
+            continue;
+        }
+
+        // Skip blank lines
+        if trimmed.is_empty() {
+            continue;
+        }
+
+        // Look for first # heading
+        if let Some(rest) = trimmed.strip_prefix("# ") {
+            let title = rest.trim();
+            if !title.is_empty() {
+                return Some(title.to_string());
+            }
+        }
+
+        // Stop searching after the first non-empty, non-heading line past frontmatter
+        if past_frontmatter || !in_frontmatter {
+            break;
+        }
+    }
+
+    None
+}
+
 /// GET /api/files
 pub async fn list_files(State(state): State<AppState>) -> impl IntoResponse {
     match state.file_manager.list_files() {
         Ok(files) => {
-            let resp: Vec<MetadataResponse> = files.into_iter().map(Into::into).collect();
+            let resp: Vec<MetadataResponse> = files
+                .into_iter()
+                .map(|m| {
+                    let title = if m.ext == "md" {
+                        // Try to read file content and extract title
+                        let id = m.id;
+                        state
+                            .file_manager
+                            .read_file_bytes(id)
+                            .ok()
+                            .and_then(|(_, bytes)| {
+                                String::from_utf8(bytes)
+                                    .ok()
+                                    .and_then(|c| extract_title(&c))
+                            })
+                    } else {
+                        None
+                    };
+                    let mut resp: MetadataResponse = m.into();
+                    resp.title = title;
+                    resp
+                })
+                .collect();
             (StatusCode::OK, Json(resp)).into_response()
         }
         Err(e) => error_response(e).into_response(),
