@@ -15,16 +15,7 @@ impl Synchronisation {
 
 impl synchronisation::Synchronisation for Synchronisation {
     fn synchronise(&self) -> Result<SynchronisationReport, SynchronisationError> {
-        if self.adapter.register_changes()? {
-            self.adapter.synchronise()
-        } else {
-            Ok(SynchronisationReport {
-                commit_name: "No changes to synchronise".to_string(),
-                last_sync_time: None,
-                last_sync_duration: None,
-                pending_changes: 0,
-            })
-        }
+        self.adapter.synchronise()
     }
 
     fn get_last_sync(&self) -> Result<SynchronisationReport, SynchronisationError> {

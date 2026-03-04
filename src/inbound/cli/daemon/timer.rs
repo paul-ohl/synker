@@ -3,7 +3,7 @@ use std::time::{Duration, SystemTime};
 
 use tokio::time::sleep;
 
-use crate::domain::ports::Synchronisation;
+use crate::domain::{ports::Synchronisation, services::synchronisation::SynchronisationError};
 
 pub async fn watch(sync: Arc<dyn Synchronisation>, sync_delay_hours: u64) {
     println!(
@@ -16,17 +16,17 @@ pub async fn watch(sync: Arc<dyn Synchronisation>, sync_delay_hours: u64) {
 
         let needs_sync = match report {
             Ok(r) => {
-                if let Some(last) = r.last_sync_time {
-                    match SystemTime::now().duration_since(last) {
-                        Ok(duration) => duration.as_secs() > sync_delay_hours * 3600,
-                        Err(_) => {
-                            // Log a warning with the error details
-                            true // Clock skew, assume sync needed
-                        }
-                    }
-                } else {
-                    true // Never synced: Log the info
-                }
+                let time_threshold_exceeded = match SystemTime::now().duration_since(r.last_sync_time) {
+                    Ok(duration) => duration.as_secs() > sync_delay_hours * 3600,
+                    Err(_) => true, // Clock skew, assume sync needed
+                };
+
+                // Sync if we have pending changes OR it's been too long since last sync
+                r.pending_changes > 0 || time_threshold_exceeded
+            }
+            Err(SynchronisationError::FirstTimeSync) => {
+                println!("First time sync detected. Proceeding to sync.");
+                true
             }
             Err(e) => {
                 eprintln!("Error checking sync status: {:?}", e);

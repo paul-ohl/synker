@@ -5,13 +5,13 @@ pub trait Synchronisation {
 
 pub struct SynchronisationReport {
     pub commit_name: String,
-    pub last_sync_time: Option<std::time::SystemTime>,
-    pub last_sync_duration: Option<std::time::Duration>,
+    pub last_sync_time: std::time::SystemTime,
     pub pending_changes: usize,
 }
 
 #[derive(Debug)]
 pub enum SynchronisationError {
+    FirstTimeSync,
     NetworkError(String),
     SyncToolError(String),
     FileConflict(String),

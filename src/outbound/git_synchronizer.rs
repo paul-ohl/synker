@@ -125,18 +125,6 @@ impl GitSynchronizer {
 }
 
 impl ports::Synchronisation for GitSynchronizer {
-    /// Checks if there are any staged or unstaged changes in the repository.
-    fn register_changes(&self) -> Result<bool, SynchronisationError> {
-        git2::Repository::discover(&self.repo_path)
-            .map_err(|e| SynchronisationError::SyncToolError(e.to_string()))
-            .and_then(|repo| {
-                let statuses = repo
-                    .statuses(None)
-                    .map_err(|e| SynchronisationError::SyncToolError(e.to_string()))?;
-                Ok(!statuses.is_empty())
-            })
-    }
-
     /// Synchronizes the local repository with the configured remote branch.
     ///
     /// The process includes:
@@ -149,16 +137,23 @@ impl ports::Synchronisation for GitSynchronizer {
 
         self.add_all(&repo)?;
 
-        let commit_message = self.generate_commit_message(&repo)?;
-        let commit_id = self.create_commit(&repo, &commit_message)?;
+        let statuses = repo
+            .statuses(None)
+            .map_err(|e| SynchronisationError::SyncToolError(e.to_string()))?;
+
+        if !statuses.is_empty() {
+            let commit_message = self.generate_commit_message(&repo)?;
+            self.create_commit(&repo, &commit_message)?;
+        }
 
         self.pull_rebase(&repo)?;
         self.push_to_origin(&repo)?;
 
+        let head = repo.head()?.peel_to_commit()?;
+
         Ok(SynchronisationReport {
-            commit_name: commit_id.to_string(),
-            last_sync_time: Some(std::time::SystemTime::now()),
-            last_sync_duration: None,
+            commit_name: head.id().to_string(),
+            last_sync_time: std::time::SystemTime::now(),
             pending_changes: 0,
         })
     }
@@ -168,14 +163,46 @@ impl ports::Synchronisation for GitSynchronizer {
         let repo = Repository::discover(&self.repo_path)
             .map_err(|e| SynchronisationError::SyncToolError(e.to_string()))?;
 
-        let head = repo.head()?.peel_to_commit()?;
-        let statuses = repo.statuses(None)?;
+        // Find the remote reference to determine the last successful sync (push)
+        let remote_ref_name = format!("refs/remotes/{}/{}", self.remote, self.branch);
+        let remote_ref = repo
+            .find_reference(&remote_ref_name)
+            .map_err(|_| SynchronisationError::FirstTimeSync)?;
+
+        let commit = remote_ref
+            .peel_to_commit()
+            .map_err(|e| SynchronisationError::SyncToolError(e.to_string()))?;
+
+        // Calculate commit time
+        let commit_time_seconds = commit.time().seconds();
+        // If commit time is before UNIX_EPOCH, we clamp it to 0.
+        let last_sync_time = std::time::SystemTime::UNIX_EPOCH
+            + std::time::Duration::from_secs(commit_time_seconds.max(0) as u64);
+
+        // Calculate pending changes size in bytes
+        let mut pending_size: u64 = 0;
+        let statuses = repo
+            .statuses(None)
+            .map_err(|e| SynchronisationError::SyncToolError(e.to_string()))?;
+
+        let workdir = repo
+            .workdir()
+            .unwrap_or_else(|| std::path::Path::new(&self.repo_path));
+
+        for entry in statuses.iter() {
+            if let Some(path_str) = entry.path() {
+                let path = workdir.join(path_str);
+                // Only count existing files (deleted files have 0 size contribution here)
+                if let Ok(metadata) = std::fs::metadata(&path) {
+                    pending_size += metadata.len();
+                }
+            }
+        }
 
         Ok(SynchronisationReport {
-            commit_name: head.id().to_string(),
-            last_sync_time: None,
-            last_sync_duration: None,
-            pending_changes: statuses.len(),
+            commit_name: commit.id().to_string(),
+            last_sync_time,
+            pending_changes: pending_size as usize,
         })
     }
 }
