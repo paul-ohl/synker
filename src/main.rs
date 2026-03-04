@@ -13,7 +13,7 @@ async fn main() {
 
     let port = std::env::var("PORT").expect("PORT environment variable not set");
     let files_dir = std::env::var("FILES_DIR").expect("FILES_DIR environment variable not set");
-    let repo_path = std::env::var("REPO_PATH").expect("REPO_PATH environment variable not set");
+    let repo_path = files_dir.clone();
     let git_remote = std::env::var("GIT_REMOTE").expect("GIT_REMOTE environment variable not set");
     let git_branch = std::env::var("GIT_BRANCH").expect("GIT_BRANCH environment variable not set");
     let git_user_email =
