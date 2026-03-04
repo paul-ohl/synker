@@ -18,6 +18,10 @@ async fn main() {
     let git_branch = std::env::var("GIT_BRANCH").expect("GIT_BRANCH environment variable not set");
     let git_user_email =
         std::env::var("GIT_USER_EMAIL").expect("GIT_USER_EMAIL environment variable not set");
+    let sync_delay = std::env::var("SYNC_DELAY_HOURS")
+        .ok()
+        .and_then(|s| s.parse::<u64>().ok())
+        .unwrap_or(24);
 
     // File manager adapter (server mode)
     let fs_adapter =
@@ -38,6 +42,7 @@ async fn main() {
         addr: format!("0.0.0.0:{}", port),
         files_dir,
         sync,
+        sync_delay,
     };
 
     dispatch(deps).await;

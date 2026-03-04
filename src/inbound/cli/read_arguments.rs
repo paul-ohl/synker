@@ -11,6 +11,7 @@ pub struct Deps {
     pub addr: String,
     pub files_dir: String,
     pub sync: Arc<dyn Synchronisation>,
+    pub sync_delay: u64,
 }
 
 pub async fn dispatch(deps: Deps) {
@@ -18,7 +19,7 @@ pub async fn dispatch(deps: Deps) {
 
     match args.get(1).map(String::as_str) {
         Some("server") => run_server(deps.state, &deps.addr).await,
-        Some("daemon") => run_daemon(&deps.files_dir, deps.sync).await,
+        Some("daemon") => run_daemon(&deps.files_dir, deps.sync, deps.sync_delay).await,
         Some(unknown) => {
             eprintln!("Unknown mode: '{}'. Valid modes are: server, daemon", unknown);
             std::process::exit(1);
