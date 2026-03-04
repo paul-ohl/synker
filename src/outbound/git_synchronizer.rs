@@ -164,7 +164,7 @@ impl ports::Synchronisation for GitSynchronizer {
     }
 
     /// Provides a report on the current synchronization state.
-    fn is_synchronised(&self) -> Result<SynchronisationReport, SynchronisationError> {
+    fn get_last_sync(&self) -> Result<SynchronisationReport, SynchronisationError> {
         let repo = Repository::discover(&self.repo_path)
             .map_err(|e| SynchronisationError::SyncToolError(e.to_string()))?;
 

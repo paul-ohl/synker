@@ -6,5 +6,5 @@ pub trait Synchronisation: Send + Sync {
     fn register_changes(&self) -> Result<bool, SynchronisationError>;
 
     fn synchronise(&self) -> Result<SynchronisationReport, SynchronisationError>;
-    fn is_synchronised(&self) -> Result<SynchronisationReport, SynchronisationError>;
+    fn get_last_sync(&self) -> Result<SynchronisationReport, SynchronisationError>;
 }

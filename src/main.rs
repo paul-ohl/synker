@@ -1,11 +1,14 @@
 use std::sync::Arc;
 
 use dotenvy::dotenv;
-use synker::domain::logic::file_manager::FileManagerLogic;
-use synker::inbound::cli::read_arguments::{Deps, dispatch};
-use synker::inbound::server::state::AppState;
-use synker::outbound::file_system::FsFileManager;
-use synker::outbound::git_synchronizer::GitSynchronizer;
+use synker::{
+    domain::logic::file_manager::FileManagerLogic,
+    inbound::{
+        cli::read_arguments::{Deps, dispatch},
+        server::state::AppState,
+    },
+    outbound::{file_system::FsFileManager, git_synchronizer::GitSynchronizer},
+};
 
 #[tokio::main]
 async fn main() {

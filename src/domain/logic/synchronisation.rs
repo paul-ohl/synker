@@ -27,7 +27,7 @@ impl synchronisation::Synchronisation for Synchronisation {
         }
     }
 
-    fn is_synchronised(&self) -> Result<SynchronisationReport, SynchronisationError> {
-        self.adapter.is_synchronised()
+    fn get_last_sync(&self) -> Result<SynchronisationReport, SynchronisationError> {
+        self.adapter.get_last_sync()
     }
 }

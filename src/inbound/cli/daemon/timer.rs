@@ -12,7 +12,7 @@ pub async fn watch(sync: Arc<dyn Synchronisation>, sync_delay_hours: u64) {
     );
 
     loop {
-        let report = sync.is_synchronised();
+        let report = sync.get_last_sync();
 
         let needs_sync = match report {
             Ok(r) => {
