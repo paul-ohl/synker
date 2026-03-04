@@ -1,0 +1,21 @@
+services:
+  synker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: synker:latest
+    environment:
+      MODE: ${MODE:-server}
+    env_file:
+      - .env
+    ports:
+      - "${PORT:-3000}:3000"
+    volumes:
+      # Use a named volume
+      - synker-data:/app/data
+      # Or a linked volume
+      # - ./data:/app/data
+    restart: unless-stopped
+
+volumes:
+  synker-data:
