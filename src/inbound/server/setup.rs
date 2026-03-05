@@ -1,38 +1,20 @@
-use std::sync::Arc;
-
 use axum::{
     Router,
     routing::{get, post},
 };
-use dotenvy::dotenv;
-use std::env;
 use tower_http::services::ServeDir;
 
 use super::handlers::backend;
 use super::handlers::editor::editor_page;
 use super::handlers::search::search_page;
 use super::state::AppState;
-use crate::domain::logic::file_manager::FileManagerLogic;
-use crate::outbound::file_system::FsFileManager;
 
 /// # Panics
 ///
 /// Panics if binding to the address fails or if the server fails to start.
-pub async fn server() {
-    dotenv().ok();
-    let port = env::var("PORT").expect("PORT environment variable not set");
-    let data_dir = env::var("DATA_DIR").unwrap_or_else(|_| "data/files".to_string());
-    let addr = format!("0.0.0.0:{}", port);
-
-    // Build the dependency graph (hexagonal wiring)
-    let fs_adapter =
-        FsFileManager::new(&data_dir).expect("Failed to initialise filesystem adapter");
-    let file_manager = Arc::new(FileManagerLogic::new(Arc::new(fs_adapter)));
-
-    let state = AppState { file_manager };
-
-    let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
-    println!("Listening on port {}", port);
+pub async fn server(state: AppState, addr: &str) {
+    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+    println!("Listening on {}", addr);
     axum::serve(listener, get_routes(state)).await.unwrap();
 }
 
@@ -59,7 +41,10 @@ fn get_backend_routes(state: AppState) -> Router<()> {
             "/files/{id}/download",
             get(backend::download_file::download_file),
         )
-        .route("/files/{id}/raw", get(backend::serve_file_raw::serve_file_raw))
+        .route(
+            "/files/{id}/raw",
+            get(backend::serve_file_raw::serve_file_raw),
+        )
         .route("/tags", get(backend::list_tags::list_tags))
         .with_state(state)
 }
