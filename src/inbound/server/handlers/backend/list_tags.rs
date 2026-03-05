@@ -4,6 +4,7 @@ use axum::{
     http::StatusCode,
     response::IntoResponse,
 };
+use crate::domain::services::file_manager::FileManager;
 use crate::inbound::server::state::AppState;
 use crate::inbound::server::error_response::error_response;
 

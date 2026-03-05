@@ -5,6 +5,7 @@ use axum::{
     Json,
 };
 use serde::Serialize;
+use crate::domain::services::file_manager::FileManager;
 use crate::inbound::server::state::AppState;
 use crate::domain::types::file::file_metadata::Metadata;
 use crate::inbound::server::error_response::error_response;
