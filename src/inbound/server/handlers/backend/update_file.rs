@@ -6,6 +6,7 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+use crate::domain::services::file_manager::FileManager;
 use crate::inbound::server::state::AppState;
 use crate::inbound::server::error_response::error_response;
 

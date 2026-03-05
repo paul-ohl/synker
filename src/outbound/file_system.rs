@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 use uuid::Uuid;
 
-use crate::domain::services::file_manager::{FileManager, FileManagerError};
+use crate::domain::{ports, services::file_manager::FileManagerError};
 use crate::domain::types::file::{
     file::{File, NewFile, UpdateFile},
     file_metadata::Metadata,
@@ -71,7 +71,7 @@ impl FsFileManager {
     }
 }
 
-impl FileManager for FsFileManager {
+impl ports::FileManager for FsFileManager {
     fn create_file(&self, new_file: NewFile) -> Result<File, FileManagerError> {
         let id = Uuid::new_v4();
         let content = new_file.content.unwrap_or_default();

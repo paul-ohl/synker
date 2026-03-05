@@ -2,26 +2,31 @@ use std::sync::Arc;
 
 use uuid::Uuid;
 
-use crate::domain::services::file_manager::{FileManager as FileManagerPort, FileManagerError};
 use crate::domain::types::file::{
     file::{File, NewFile, UpdateFile},
     file_metadata::Metadata,
     file_query::FileQuery,
 };
+use crate::domain::{
+    ports,
+    services::file_manager::{self, FileManagerError},
+};
 
 /// Domain logic orchestrator for file management.
-/// Holds an adapter (outbound port) and applies business rules
-/// before delegating to the adapter.
+/// Implements the `services::FileManager` trait, applying business rules
+/// before delegating raw storage operations to a `ports::FileManager` adapter.
 pub struct FileManagerLogic {
-    adapter: Arc<dyn FileManagerPort>,
+    adapter: Arc<dyn ports::FileManager>,
 }
 
 impl FileManagerLogic {
-    pub fn new(adapter: Arc<dyn FileManagerPort>) -> Self {
+    pub fn new(adapter: Arc<dyn ports::FileManager>) -> Self {
         Self { adapter }
     }
+}
 
-    pub fn create_file(&self, new_file: NewFile) -> Result<File, FileManagerError> {
+impl file_manager::FileManager for FileManagerLogic {
+    fn create_file(&self, new_file: NewFile) -> Result<File, FileManagerError> {
         // Business rule: validate the NewFile metadata
         let validated = NewFile::new(new_file.metadata, new_file.content)
             .map_err(|e| FileManagerError::ValidationError(e.to_string()))?;
@@ -29,7 +34,7 @@ impl FileManagerLogic {
         self.adapter.create_file(validated)
     }
 
-    pub fn create_file_bytes(
+    fn create_file_bytes(
         &self,
         name: String,
         ext: String,
@@ -50,23 +55,23 @@ impl FileManagerLogic {
         self.adapter.create_file_bytes(name, ext, mime, tags, data)
     }
 
-    pub fn read_file(&self, file_id: Uuid) -> Result<File, FileManagerError> {
+    fn read_file(&self, file_id: Uuid) -> Result<File, FileManagerError> {
         self.adapter.read_file(file_id)
     }
 
-    pub fn read_file_bytes(&self, file_id: Uuid) -> Result<(Metadata, Vec<u8>), FileManagerError> {
+    fn read_file_bytes(&self, file_id: Uuid) -> Result<(Metadata, Vec<u8>), FileManagerError> {
         self.adapter.read_file_bytes(file_id)
     }
 
-    pub fn list_files(&self) -> Result<Vec<Metadata>, FileManagerError> {
+    fn list_files(&self) -> Result<Vec<Metadata>, FileManagerError> {
         self.adapter.list_files()
     }
 
-    pub fn list_all_tags(&self) -> Result<Vec<String>, FileManagerError> {
+    fn list_all_tags(&self) -> Result<Vec<String>, FileManagerError> {
         self.adapter.list_all_tags()
     }
 
-    pub fn update_file(&self, file_id: Uuid, update: UpdateFile) -> Result<File, FileManagerError> {
+    fn update_file(&self, file_id: Uuid, update: UpdateFile) -> Result<File, FileManagerError> {
         // Validate update before delegating
         let validated = UpdateFile::new(update.metadata, update.content)
             .map_err(|e| FileManagerError::ValidationError(e.to_string()))?;
@@ -74,11 +79,11 @@ impl FileManagerLogic {
         self.adapter.update_file(file_id, validated)
     }
 
-    pub fn delete_file(&self, file_id: Uuid) -> Result<(), FileManagerError> {
+    fn delete_file(&self, file_id: Uuid) -> Result<(), FileManagerError> {
         self.adapter.delete_file(file_id)
     }
 
-    pub fn find(&self, query: FileQuery) -> Result<Vec<Metadata>, FileManagerError> {
+    fn find(&self, query: FileQuery) -> Result<Vec<Metadata>, FileManagerError> {
         query.verify().map_err(FileManagerError::ValidationError)?;
 
         self.adapter.find(query)

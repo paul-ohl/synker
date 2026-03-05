@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use super::super::state::AppState;
-use crate::domain::services::file_manager::FileManagerError;
+use crate::domain::services::file_manager::{FileManager, FileManagerError};
 use crate::domain::types::file::file_metadata::Metadata;
 
 // ── Request DTOs ──────────────────────────────────────────────
