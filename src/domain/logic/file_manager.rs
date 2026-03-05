@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use tracing::{debug, instrument, warn};
 use uuid::Uuid;
 
 use crate::domain::types::file::{
@@ -26,14 +27,23 @@ impl FileManagerLogic {
 }
 
 impl file_manager::FileManager for FileManagerLogic {
+    #[instrument(skip(self), fields(name = %new_file.metadata.name, ext = %new_file.metadata.ext))]
     fn create_file(&self, new_file: NewFile) -> Result<File, FileManagerError> {
+        debug!("Validating new file");
         // Business rule: validate the NewFile metadata
-        let validated = NewFile::new(new_file.metadata, new_file.content)
-            .map_err(|e| FileManagerError::ValidationError(e.to_string()))?;
+        let validated = NewFile::new(new_file.metadata, new_file.content).map_err(|e| {
+            warn!(error = %e, "Validation failed for create_file");
+            FileManagerError::ValidationError(e.to_string())
+        })?;
 
-        self.adapter.create_file(validated)
+        let result = self.adapter.create_file(validated);
+        if let Ok(ref f) = result {
+            debug!(file_id = %f.id, "File created successfully");
+        }
+        result
     }
 
+    #[instrument(skip(self, data), fields(name, ext))]
     fn create_file_bytes(
         &self,
         name: String,
@@ -42,51 +52,109 @@ impl file_manager::FileManager for FileManagerLogic {
         tags: Vec<String>,
         data: Vec<u8>,
     ) -> Result<Metadata, FileManagerError> {
+        debug!(name = %name, ext = %ext, bytes = data.len(), "Validating binary file upload");
         if name.trim().is_empty() {
+            warn!("create_file_bytes rejected: empty file name");
             return Err(FileManagerError::ValidationError(
                 "File name cannot be empty".to_string(),
             ));
         }
         if ext.trim().is_empty() {
+            warn!("create_file_bytes rejected: empty extension");
             return Err(FileManagerError::ValidationError(
                 "Extension cannot be empty".to_string(),
             ));
         }
-        self.adapter.create_file_bytes(name, ext, mime, tags, data)
+        let result = self.adapter.create_file_bytes(name, ext, mime, tags, data);
+        if let Ok(ref m) = result {
+            debug!(file_id = %m.id, "Binary file created successfully");
+        }
+        result
     }
 
+    #[instrument(skip(self))]
     fn read_file(&self, file_id: Uuid) -> Result<File, FileManagerError> {
-        self.adapter.read_file(file_id)
+        debug!("Reading file");
+        let result = self.adapter.read_file(file_id);
+        if let Err(ref e) = result {
+            warn!(file_id = %file_id, error = %e, "read_file failed");
+        }
+        result
     }
 
+    #[instrument(skip(self))]
     fn read_file_bytes(&self, file_id: Uuid) -> Result<(Metadata, Vec<u8>), FileManagerError> {
-        self.adapter.read_file_bytes(file_id)
+        debug!("Reading file bytes");
+        let result = self.adapter.read_file_bytes(file_id);
+        if let Err(ref e) = result {
+            warn!(file_id = %file_id, error = %e, "read_file_bytes failed");
+        }
+        result
     }
 
+    #[instrument(skip(self))]
     fn list_files(&self) -> Result<Vec<Metadata>, FileManagerError> {
-        self.adapter.list_files()
+        debug!("Listing all files");
+        let result = self.adapter.list_files();
+        if let Ok(ref files) = result {
+            debug!(count = files.len(), "Listed files");
+        }
+        result
     }
 
+    #[instrument(skip(self))]
     fn list_all_tags(&self) -> Result<Vec<String>, FileManagerError> {
-        self.adapter.list_all_tags()
+        debug!("Listing all tags");
+        let result = self.adapter.list_all_tags();
+        if let Ok(ref tags) = result {
+            debug!(count = tags.len(), "Listed tags");
+        }
+        result
     }
 
+    #[instrument(skip(self))]
     fn update_file(&self, file_id: Uuid, update: UpdateFile) -> Result<File, FileManagerError> {
+        debug!("Validating file update");
         // Validate update before delegating
-        let validated = UpdateFile::new(update.metadata, update.content)
-            .map_err(|e| FileManagerError::ValidationError(e.to_string()))?;
+        let validated = UpdateFile::new(update.metadata, update.content).map_err(|e| {
+            warn!(file_id = %file_id, error = %e, "Validation failed for update_file");
+            FileManagerError::ValidationError(e.to_string())
+        })?;
 
-        self.adapter.update_file(file_id, validated)
+        let result = self.adapter.update_file(file_id, validated);
+        if let Err(ref e) = result {
+            warn!(file_id = %file_id, error = %e, "update_file failed");
+        } else {
+            debug!(file_id = %file_id, "File updated successfully");
+        }
+        result
     }
 
+    #[instrument(skip(self))]
     fn delete_file(&self, file_id: Uuid) -> Result<(), FileManagerError> {
-        self.adapter.delete_file(file_id)
+        debug!("Deleting file");
+        let result = self.adapter.delete_file(file_id);
+        if let Err(ref e) = result {
+            warn!(file_id = %file_id, error = %e, "delete_file failed");
+        } else {
+            debug!(file_id = %file_id, "File deleted successfully");
+        }
+        result
     }
 
+    #[instrument(skip(self))]
     fn find(&self, query: FileQuery) -> Result<Vec<Metadata>, FileManagerError> {
-        query.verify().map_err(FileManagerError::ValidationError)?;
+        debug!("Executing file query");
+        query.verify().map_err(|e| {
+            warn!(error = %e, "Invalid file query");
+            FileManagerError::ValidationError(e)
+        })?;
 
-        self.adapter.find(query)
+        let result = self.adapter.find(query);
+        if let Ok(ref files) = result {
+            debug!(matches = files.len(), "Query returned results");
+        }
+        result
     }
 }
 

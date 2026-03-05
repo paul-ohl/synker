@@ -3,6 +3,8 @@ use axum::{
     routing::{get, post},
 };
 use tower_http::services::ServeDir;
+use tower_http::trace::TraceLayer;
+use tracing::info;
 
 use super::handlers::backend;
 use super::handlers::editor::editor_page;
@@ -14,7 +16,7 @@ use super::state::AppState;
 /// Panics if binding to the address fails or if the server fails to start.
 pub async fn server(state: AppState, addr: &str) {
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
-    println!("Listening on {}", addr);
+    info!(address = addr, "HTTP server listening");
     axum::serve(listener, get_routes(state)).await.unwrap();
 }
 
@@ -22,6 +24,9 @@ fn get_routes(state: AppState) -> Router<()> {
     Router::new()
         .merge(get_frontend_routes())
         .nest("/api", get_backend_routes(state))
+        // Emit a tracing span for every HTTP request/response automatically.
+        // At RUST_LOG=debug or tower_http=trace the full headers are included.
+        .layer(TraceLayer::new_for_http())
 }
 
 fn get_backend_routes(state: AppState) -> Router<()> {

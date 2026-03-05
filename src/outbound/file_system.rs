@@ -2,6 +2,7 @@ use std::fs;
 use std::io;
 use std::path::PathBuf;
 
+use tracing::{debug, instrument, warn};
 use uuid::Uuid;
 
 use crate::domain::{ports, services::file_manager::FileManagerError};
@@ -72,12 +73,14 @@ impl FsFileManager {
 }
 
 impl ports::FileManager for FsFileManager {
+    #[instrument(skip(self), fields(name = %new_file.metadata.name, ext = %new_file.metadata.ext))]
     fn create_file(&self, new_file: NewFile) -> Result<File, FileManagerError> {
         let id = Uuid::new_v4();
         let content = new_file.content.unwrap_or_default();
         let ext = &new_file.metadata.ext;
         let file_path = self.file_path(id, ext);
 
+        debug!(file_id = %id, path = %file_path.display(), "Writing file content to disk");
         // Write content to disk
         fs::write(&file_path, &content).map_err(|e| FileManagerError::IoError(e.to_string()))?;
 
@@ -96,6 +99,7 @@ impl ports::FileManager for FsFileManager {
         };
 
         self.write_metadata(&metadata)?;
+        debug!(file_id = %id, size, "File created on disk");
 
         Ok(File {
             id,
@@ -104,6 +108,7 @@ impl ports::FileManager for FsFileManager {
         })
     }
 
+    #[instrument(skip(self, data), fields(name, ext))]
     fn create_file_bytes(
         &self,
         name: String,
@@ -115,6 +120,7 @@ impl ports::FileManager for FsFileManager {
         let id = Uuid::new_v4();
         let file_path = self.file_path(id, &ext);
 
+        debug!(file_id = %id, path = %file_path.display(), bytes = data.len(), "Writing binary file to disk");
         fs::write(&file_path, &data).map_err(|e| FileManagerError::IoError(e.to_string()))?;
 
         let size = data.len() as u64;
@@ -132,13 +138,17 @@ impl ports::FileManager for FsFileManager {
         };
 
         self.write_metadata(&metadata)?;
+        debug!(file_id = %id, size, "Binary file created on disk");
         Ok(metadata)
     }
 
+    #[instrument(skip(self))]
     fn read_file(&self, file_id: Uuid) -> Result<File, FileManagerError> {
+        debug!("Reading file metadata and content");
         let metadata = self.read_metadata(file_id)?;
         let file_path = self.file_path(file_id, &metadata.ext);
 
+        debug!(path = %file_path.display(), "Reading file content from disk");
         let content = fs::read_to_string(&file_path).map_err(|e| match e.kind() {
             io::ErrorKind::NotFound => {
                 FileManagerError::FileNotFound(format!("File not found: {file_id}"))
@@ -153,10 +163,13 @@ impl ports::FileManager for FsFileManager {
         })
     }
 
+    #[instrument(skip(self))]
     fn read_file_bytes(&self, file_id: Uuid) -> Result<(Metadata, Vec<u8>), FileManagerError> {
+        debug!("Reading file metadata and raw bytes");
         let metadata = self.read_metadata(file_id)?;
         let file_path = self.file_path(file_id, &metadata.ext);
 
+        debug!(path = %file_path.display(), "Reading raw bytes from disk");
         let data = fs::read(&file_path).map_err(|e| match e.kind() {
             io::ErrorKind::NotFound => {
                 FileManagerError::FileNotFound(format!("File not found: {file_id}"))
@@ -167,7 +180,9 @@ impl ports::FileManager for FsFileManager {
         Ok((metadata, data))
     }
 
+    #[instrument(skip(self))]
     fn list_files(&self) -> Result<Vec<Metadata>, FileManagerError> {
+        debug!("Scanning metadata directory");
         let mut files = Vec::new();
 
         let entries =
@@ -180,19 +195,23 @@ impl ports::FileManager for FsFileManager {
             if path.extension().is_some_and(|e| e == "json") {
                 let json = fs::read_to_string(&path)
                     .map_err(|e| FileManagerError::IoError(e.to_string()))?;
-                if let Ok(metadata) = serde_json::from_str::<Metadata>(&json) {
-                    files.push(metadata);
+                match serde_json::from_str::<Metadata>(&json) {
+                    Ok(metadata) => files.push(metadata),
+                    Err(e) => warn!(path = %path.display(), error = %e, "Failed to deserialise metadata file; skipping"),
                 }
             }
         }
 
         // Sort by modified_at descending (newest first)
         files.sort_by(|a, b| b.modified_at.cmp(&a.modified_at));
+        debug!(count = files.len(), "Listed files from disk");
 
         Ok(files)
     }
 
+    #[instrument(skip(self))]
     fn list_all_tags(&self) -> Result<Vec<String>, FileManagerError> {
+        debug!("Aggregating all tags");
         let files = self.list_files()?;
         let mut tag_set = std::collections::BTreeSet::new();
         for f in &files {
@@ -200,10 +219,14 @@ impl ports::FileManager for FsFileManager {
                 tag_set.insert(t.clone());
             }
         }
-        Ok(tag_set.into_iter().collect())
+        let tags: Vec<String> = tag_set.into_iter().collect();
+        debug!(count = tags.len(), "Aggregated unique tags");
+        Ok(tags)
     }
 
+    #[instrument(skip(self))]
     fn update_file(&self, file_id: Uuid, update: UpdateFile) -> Result<File, FileManagerError> {
+        debug!("Loading metadata for update");
         let mut metadata = self.read_metadata(file_id)?;
         let old_ext = metadata.ext.clone();
 
@@ -227,12 +250,14 @@ impl ports::FileManager for FsFileManager {
         let content = if let Some(new_content) = update.content {
             // Write new content
             let file_path = self.file_path(file_id, &metadata.ext);
+            debug!(path = %file_path.display(), "Writing updated content to disk");
             fs::write(&file_path, &new_content)
                 .map_err(|e| FileManagerError::IoError(e.to_string()))?;
 
             // If extension changed, remove old file
             if old_ext != metadata.ext {
                 let old_path = self.file_path(file_id, &old_ext);
+                debug!(old_path = %old_path.display(), new_ext = %metadata.ext, "Extension changed; removing old file");
                 let _ = fs::remove_file(old_path);
             }
 
@@ -243,6 +268,11 @@ impl ports::FileManager for FsFileManager {
             if old_ext != metadata.ext {
                 let old_path = self.file_path(file_id, &old_ext);
                 let new_path = self.file_path(file_id, &metadata.ext);
+                debug!(
+                    old_path = %old_path.display(),
+                    new_path = %new_path.display(),
+                    "Renaming file due to extension change"
+                );
                 fs::rename(&old_path, &new_path)
                     .map_err(|e| FileManagerError::IoError(e.to_string()))?;
             }
@@ -252,6 +282,7 @@ impl ports::FileManager for FsFileManager {
 
         metadata.modified_at = self.now_iso();
         self.write_metadata(&metadata)?;
+        debug!(file_id = %file_id, "File updated on disk");
 
         Ok(File {
             id: file_id,
@@ -260,25 +291,32 @@ impl ports::FileManager for FsFileManager {
         })
     }
 
+    #[instrument(skip(self))]
     fn delete_file(&self, file_id: Uuid) -> Result<(), FileManagerError> {
+        debug!("Loading metadata for deletion");
         let metadata = self.read_metadata(file_id)?;
 
         // Remove content file
         let file_path = self.file_path(file_id, &metadata.ext);
         if file_path.exists() {
+            debug!(path = %file_path.display(), "Removing content file");
             fs::remove_file(&file_path).map_err(|e| FileManagerError::IoError(e.to_string()))?;
         }
 
         // Remove metadata file
         let meta_path = self.meta_file_path(file_id);
         if meta_path.exists() {
+            debug!(path = %meta_path.display(), "Removing metadata file");
             fs::remove_file(&meta_path).map_err(|e| FileManagerError::IoError(e.to_string()))?;
         }
 
+        debug!(file_id = %file_id, "File deleted from disk");
         Ok(())
     }
 
+    #[instrument(skip(self))]
     fn find(&self, query: FileQuery) -> Result<Vec<Metadata>, FileManagerError> {
+        debug!("Executing find query");
         let all = self.list_files()?;
 
         let results: Vec<Metadata> = all
@@ -326,6 +364,7 @@ impl ports::FileManager for FsFileManager {
         // Content search (need to read files)
         if let Some(file_contains) = &query.file_contains {
             let search_term = file_contains.to_lowercase();
+            debug!(term = %search_term, candidates = results.len(), "Running full-text content search");
             let mut content_results = Vec::new();
             for m in &results {
                 let file_path = self.file_path(m.id, &m.ext);
@@ -335,9 +374,11 @@ impl ports::FileManager for FsFileManager {
                     content_results.push(m.clone());
                 }
             }
+            debug!(matches = content_results.len(), "Content search complete");
             return Ok(content_results);
         }
 
+        debug!(matches = results.len(), "Find query complete");
         Ok(results)
     }
 }

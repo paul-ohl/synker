@@ -9,10 +9,26 @@ use synker::{
     },
     outbound::{file_system::FsFileManager, git_synchronizer::GitSynchronizer},
 };
+use tracing::info;
+use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
 #[tokio::main]
 async fn main() {
     dotenv().ok();
+
+    // Initialise the tracing subscriber.
+    // Log level is controlled via the RUST_LOG environment variable.
+    // Example: RUST_LOG=info  or  RUST_LOG=synker=debug,tower_http=trace
+    // Defaults to "info" when RUST_LOG is not set.
+    tracing_subscriber::registry()
+        .with(fmt::layer())
+        .with(
+            EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| EnvFilter::new("info")),
+        )
+        .init();
+
+    info!("Starting synker");
 
     let port = std::env::var("PORT").expect("PORT environment variable not set");
     let files_dir = std::env::var("FILES_DIR").expect("FILES_DIR environment variable not set");
@@ -25,6 +41,16 @@ async fn main() {
         .ok()
         .and_then(|s| s.parse::<u64>().ok())
         .unwrap_or(24);
+
+    info!(
+        port,
+        files_dir,
+        git_remote,
+        git_branch,
+        git_user_email,
+        sync_delay_hours = sync_delay,
+        "Configuration loaded"
+    );
 
     // File manager adapter (server mode)
     let fs_adapter =

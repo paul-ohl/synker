@@ -1,6 +1,8 @@
 use std::env;
 use std::sync::Arc;
 
+use tracing::error;
+
 use crate::domain::ports::Synchronisation;
 use crate::inbound::cli::modes::{run_daemon, run_server};
 use crate::inbound::server::state::AppState;
@@ -21,12 +23,12 @@ pub async fn dispatch(deps: Deps) {
         Some("server") => run_server(deps.state, &deps.addr).await,
         Some("daemon") => run_daemon(&deps.files_dir, deps.sync, deps.sync_delay).await,
         Some(unknown) => {
-            eprintln!("Unknown mode: '{}'. Valid modes are: server, daemon", unknown);
+            error!(mode = unknown, "Unknown mode; valid modes are: server, daemon");
             std::process::exit(1);
         }
         None => {
             let program = args.first().map(String::as_str).unwrap_or("synker");
-            eprintln!("Usage: {} <server|daemon>", program);
+            error!(program, "No mode provided; usage: <program> <server|daemon>");
             std::process::exit(1);
         }
     }

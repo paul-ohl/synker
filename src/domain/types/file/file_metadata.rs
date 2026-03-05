@@ -39,6 +39,7 @@ impl fmt::Display for MetadataCreationError {
 
 impl std::error::Error for MetadataCreationError {}
 
+#[derive(Debug)]
 pub struct NewMetadata {
     pub name: String,
     pub ext: String,
@@ -83,6 +84,7 @@ impl NewMetadata {
     }
 }
 
+#[derive(Debug)]
 pub struct UpdateMetadata {
     pub name: Option<String>,
     pub ext: Option<String>,

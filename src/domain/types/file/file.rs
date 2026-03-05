@@ -12,6 +12,7 @@ pub struct File {
     pub content: String,
 }
 
+#[derive(Debug)]
 pub struct NewFile {
     pub metadata: NewMetadata,
     pub content: Option<String>,
@@ -32,6 +33,7 @@ impl NewFile {
     }
 }
 
+#[derive(Debug)]
 pub struct UpdateFile {
     pub metadata: Option<UpdateMetadata>,
     pub content: Option<String>,
