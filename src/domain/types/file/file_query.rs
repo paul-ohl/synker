@@ -232,3 +232,150 @@ impl Default for FileQuery {
         Self::new()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::Duration;
+
+    #[test]
+    fn test_query_default_is_empty() {
+        let q = FileQuery::new();
+        assert!(q.extension.is_none());
+        assert!(q.name_contains.is_none());
+        assert!(q.file_contains.is_none());
+        assert!(q.size_greater_than.is_none());
+        assert!(q.size_smaller_than.is_none());
+        assert!(q.tags.is_none());
+        assert!(q.modified_after.is_none());
+        assert!(q.modified_before.is_none());
+        assert!(!q.orphans);
+        assert!(q.backlinks_to.is_none());
+        assert!(q.links_to.is_none());
+    }
+
+    #[test]
+    fn test_query_builder_methods() {
+        let id = Uuid::new_v4();
+        let id2 = Uuid::new_v4();
+        let now = SystemTime::now();
+        let later = now + Duration::from_secs(3600);
+
+        let q = FileQuery::new()
+            .with_extension("rs".to_string())
+            .with_name_contains("main".to_string())
+            .with_file_contains("fn main".to_string())
+            .with_size_greater_than(100)
+            .with_size_smaller_than(9999)
+            .with_tags(vec!["rust".to_string()])
+            .with_modified_after(now)
+            .with_modified_before(later)
+            .with_orphans(true)
+            .with_links_to(id);
+
+        assert_eq!(q.extension.as_deref(), Some("rs"));
+        assert_eq!(q.name_contains.as_deref(), Some("main"));
+        assert_eq!(q.file_contains.as_deref(), Some("fn main"));
+        assert_eq!(q.size_greater_than, Some(100));
+        assert_eq!(q.size_smaller_than, Some(9999));
+        assert_eq!(q.tags, Some(vec!["rust".to_string()]));
+        assert_eq!(q.modified_after, Some(now));
+        assert_eq!(q.modified_before, Some(later));
+        assert!(q.orphans);
+        assert_eq!(q.links_to, Some(id));
+
+        // Test backlinks_to builder separately
+        let q2 = FileQuery::new().with_backlinks_to(vec![id2]);
+        assert_eq!(q2.backlinks_to, Some(vec![id2]));
+    }
+
+    #[test]
+    fn test_verify_valid_empty() {
+        let q = FileQuery::new();
+        assert!(q.verify().is_ok());
+    }
+
+    #[test]
+    fn test_verify_size_order_ok() {
+        let q = FileQuery::new()
+            .with_size_greater_than(100)
+            .with_size_smaller_than(200);
+        assert!(q.verify().is_ok());
+
+        // Equal values are also fine (inclusive range)
+        let q2 = FileQuery::new()
+            .with_size_greater_than(100)
+            .with_size_smaller_than(100);
+        assert!(q2.verify().is_ok());
+    }
+
+    #[test]
+    fn test_verify_size_order_err() {
+        let q = FileQuery::new()
+            .with_size_greater_than(500)
+            .with_size_smaller_than(100);
+        let result = q.verify();
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .contains("size_greater_than cannot be larger than size_smaller_than"));
+    }
+
+    #[test]
+    fn test_verify_time_order_ok() {
+        let now = SystemTime::now();
+        let later = now + Duration::from_secs(3600);
+        let q = FileQuery::new()
+            .with_modified_after(now)
+            .with_modified_before(later);
+        assert!(q.verify().is_ok());
+
+        // Equal times are fine
+        let q2 = FileQuery::new()
+            .with_modified_after(now)
+            .with_modified_before(now);
+        assert!(q2.verify().is_ok());
+    }
+
+    #[test]
+    fn test_verify_time_order_err() {
+        let now = SystemTime::now();
+        let earlier = now - Duration::from_secs(3600);
+        let q = FileQuery::new()
+            .with_modified_after(now)
+            .with_modified_before(earlier);
+        let result = q.verify();
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .contains("modified_after cannot be later than modified_before"));
+    }
+
+    #[test]
+    fn test_verify_backlinks_and_links_exclusive() {
+        let id1 = Uuid::new_v4();
+        let id2 = Uuid::new_v4();
+        let q = FileQuery::new()
+            .with_backlinks_to(vec![id1])
+            .with_links_to(id2);
+        let result = q.verify();
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .contains("backlinks_to and links_to cannot be used at the same time"));
+    }
+
+    #[test]
+    fn test_verify_only_backlinks_ok() {
+        let id = Uuid::new_v4();
+        let q = FileQuery::new().with_backlinks_to(vec![id]);
+        assert!(q.verify().is_ok());
+    }
+
+    #[test]
+    fn test_verify_only_links_to_ok() {
+        let id = Uuid::new_v4();
+        let q = FileQuery::new().with_links_to(id);
+        assert!(q.verify().is_ok());
+    }
+}

@@ -53,3 +53,20 @@ impl fmt::Display for FileManagerError {
 }
 
 impl std::error::Error for FileManagerError {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_display_file_already_exists() {
+        let e = FileManagerError::FileAlreadyExists("foo.md".to_string());
+        assert_eq!(e.to_string(), "File already exists: foo.md");
+    }
+
+    #[test]
+    fn test_display_permission_denied() {
+        let e = FileManagerError::PermissionDenied("secret.txt".to_string());
+        assert_eq!(e.to_string(), "Permission denied: secret.txt");
+    }
+}

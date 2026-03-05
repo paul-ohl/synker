@@ -134,3 +134,218 @@ impl UpdateMetadata {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── NewMetadata ──────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_new_metadata_valid() {
+        let result = NewMetadata::new(
+            "readme".to_string(),
+            "md".to_string(),
+            vec!["docs".to_string(), "rust".to_string()],
+            "text/markdown".to_string(),
+        );
+        assert!(result.is_ok());
+        let m = result.unwrap();
+        assert_eq!(m.name, "readme");
+        assert_eq!(m.ext, "md");
+        assert_eq!(m.tags, vec!["docs", "rust"]);
+        assert_eq!(m.mime, "text/markdown");
+    }
+
+    #[test]
+    fn test_new_metadata_empty_name() {
+        let result = NewMetadata::new(
+            "".to_string(),
+            "md".to_string(),
+            vec![],
+            "text/plain".to_string(),
+        );
+        assert!(matches!(result, Err(MetadataCreationError::InvalidName(_))));
+    }
+
+    #[test]
+    fn test_new_metadata_whitespace_name() {
+        let result = NewMetadata::new(
+            "   ".to_string(),
+            "md".to_string(),
+            vec![],
+            "text/plain".to_string(),
+        );
+        assert!(matches!(result, Err(MetadataCreationError::InvalidName(_))));
+    }
+
+    #[test]
+    fn test_new_metadata_empty_ext() {
+        let result = NewMetadata::new(
+            "readme".to_string(),
+            "".to_string(),
+            vec![],
+            "text/plain".to_string(),
+        );
+        assert!(matches!(
+            result,
+            Err(MetadataCreationError::InvalidExtension(_))
+        ));
+    }
+
+    #[test]
+    fn test_new_metadata_whitespace_ext() {
+        let result = NewMetadata::new(
+            "readme".to_string(),
+            "  ".to_string(),
+            vec![],
+            "text/plain".to_string(),
+        );
+        assert!(matches!(
+            result,
+            Err(MetadataCreationError::InvalidExtension(_))
+        ));
+    }
+
+    #[test]
+    fn test_new_metadata_empty_tag_in_list() {
+        let result = NewMetadata::new(
+            "readme".to_string(),
+            "md".to_string(),
+            vec!["good-tag".to_string(), "".to_string()],
+            "text/plain".to_string(),
+        );
+        assert!(matches!(result, Err(MetadataCreationError::InvalidTags(_))));
+    }
+
+    #[test]
+    fn test_new_metadata_whitespace_tag_in_list() {
+        let result = NewMetadata::new(
+            "readme".to_string(),
+            "md".to_string(),
+            vec!["   ".to_string()],
+            "text/plain".to_string(),
+        );
+        assert!(matches!(result, Err(MetadataCreationError::InvalidTags(_))));
+    }
+
+    #[test]
+    fn test_new_metadata_empty_tags_list_is_ok() {
+        let result = NewMetadata::new(
+            "readme".to_string(),
+            "md".to_string(),
+            vec![],
+            "text/plain".to_string(),
+        );
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_new_metadata_empty_mime() {
+        let result = NewMetadata::new(
+            "readme".to_string(),
+            "md".to_string(),
+            vec![],
+            "".to_string(),
+        );
+        assert!(matches!(
+            result,
+            Err(MetadataCreationError::InvalidMimeType(_))
+        ));
+    }
+
+    #[test]
+    fn test_new_metadata_display_errors() {
+        assert_eq!(
+            MetadataCreationError::InvalidName("".to_string()).to_string(),
+            "Invalid name: ''"
+        );
+        assert_eq!(
+            MetadataCreationError::InvalidExtension("".to_string()).to_string(),
+            "Invalid extension: ''"
+        );
+        assert_eq!(
+            MetadataCreationError::InvalidTags("bad tags".to_string()).to_string(),
+            "Invalid tags: bad tags"
+        );
+        assert_eq!(
+            MetadataCreationError::InvalidMimeType("".to_string()).to_string(),
+            "Invalid MIME type: ''"
+        );
+        assert_eq!(
+            MetadataCreationError::InvalidSize(0).to_string(),
+            "Invalid size: 0"
+        );
+        assert_eq!(
+            MetadataCreationError::InvalidTimestamps(
+                "2020-01-01".to_string(),
+                "2019-01-01".to_string()
+            )
+            .to_string(),
+            "Invalid timestamps: 2020-01-01, 2019-01-01"
+        );
+    }
+
+    // ── UpdateMetadata ───────────────────────────────────────────────────────
+
+    #[test]
+    fn test_update_metadata_valid_all_none() {
+        let result = UpdateMetadata::new(None, None, None, None);
+        assert!(result.is_ok());
+        let m = result.unwrap();
+        assert!(m.name.is_none());
+        assert!(m.ext.is_none());
+        assert!(m.tags.is_none());
+        assert!(m.mime.is_none());
+    }
+
+    #[test]
+    fn test_update_metadata_valid_some_fields() {
+        let result = UpdateMetadata::new(
+            Some("new-name".to_string()),
+            Some("txt".to_string()),
+            Some(vec!["tag1".to_string()]),
+            Some("text/plain".to_string()),
+        );
+        assert!(result.is_ok());
+        let m = result.unwrap();
+        assert_eq!(m.name.as_deref(), Some("new-name"));
+        assert_eq!(m.ext.as_deref(), Some("txt"));
+        assert_eq!(m.mime.as_deref(), Some("text/plain"));
+    }
+
+    #[test]
+    fn test_update_metadata_empty_name() {
+        let result = UpdateMetadata::new(Some("".to_string()), None, None, None);
+        assert!(matches!(result, Err(MetadataCreationError::InvalidName(_))));
+    }
+
+    #[test]
+    fn test_update_metadata_empty_ext() {
+        let result = UpdateMetadata::new(None, Some("".to_string()), None, None);
+        assert!(matches!(
+            result,
+            Err(MetadataCreationError::InvalidExtension(_))
+        ));
+    }
+
+    #[test]
+    fn test_update_metadata_empty_tag() {
+        let result = UpdateMetadata::new(
+            None,
+            None,
+            Some(vec!["ok".to_string(), "".to_string()]),
+            None,
+        );
+        assert!(matches!(result, Err(MetadataCreationError::InvalidTags(_))));
+    }
+
+    #[test]
+    fn test_update_metadata_empty_mime() {
+        let result = UpdateMetadata::new(None, None, None, Some("".to_string()));
+        assert!(matches!(
+            result,
+            Err(MetadataCreationError::InvalidMimeType(_))
+        ));
+    }
+}

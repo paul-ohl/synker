@@ -28,3 +28,45 @@ pub fn error_response(e: FileManagerError) -> impl IntoResponse {
         }),
     )
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::http::StatusCode;
+
+    #[test]
+    fn test_error_status_file_not_found() {
+        let err = FileManagerError::FileNotFound("file.md".to_string());
+        assert_eq!(error_status(&err), StatusCode::NOT_FOUND);
+    }
+
+    #[test]
+    fn test_error_status_conflict() {
+        let err = FileManagerError::FileAlreadyExists("file.md".to_string());
+        assert_eq!(error_status(&err), StatusCode::CONFLICT);
+    }
+
+    #[test]
+    fn test_error_status_forbidden() {
+        let err = FileManagerError::PermissionDenied("no access".to_string());
+        assert_eq!(error_status(&err), StatusCode::FORBIDDEN);
+    }
+
+    #[test]
+    fn test_error_status_bad_request() {
+        let err = FileManagerError::ValidationError("bad input".to_string());
+        assert_eq!(error_status(&err), StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn test_error_status_io_error() {
+        let err = FileManagerError::IoError("disk full".to_string());
+        assert_eq!(error_status(&err), StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    #[test]
+    fn test_error_status_unknown_error() {
+        let err = FileManagerError::UnknownError("something went wrong".to_string());
+        assert_eq!(error_status(&err), StatusCode::INTERNAL_SERVER_ERROR);
+    }
+}
